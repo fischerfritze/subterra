@@ -1,0 +1,23 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# Build/Artefakte
+build/
+dist/
+
+# Logs/Temp/Jupyter
+*.log
+**/.ipynb_checkpoints/
+
+# Große/erzeugte Ordner (anpassen!)
+results/
+meshes/
+
+# Secrets/Env
+.env
+.env.*

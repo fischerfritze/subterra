@@ -1,0 +1,54 @@
+{
+  "version": "2",
+  "useMode": "local",
+  "meshMode": ["hexa", 1],
+  "enableConvection": true,
+
+  "temperatureAbsolute": { "value": 273.15, "unit": "K" },
+  "temperatureHot":       { "value": 40,     "unit": "°C" },
+
+  "mesh": {
+    "meshFactor":     { "value": 1,  "unit": "m" },
+    "meshFine":       { "value": 0.25,  "unit": "m" },
+    "boreholeDistance":   { "value": 5,     "unit": "m" },
+    "xLength":        { "value": 400,   "unit": "m" },
+    "yLength":        { "value": 200,   "unit": "m" },
+    "xCenter":        { "value": -100,   "unit": "m" },
+    "yCenter":        { "value": 0,     "unit": "m" }
+  },
+
+  "time": {
+    "timeStepHours":  { "value": 24, "unit": "h" },
+    "simulationYears":{ "value": 20, "unit": "year" }
+  },
+
+  "ground": {
+    "heatCapacityDensity": { "value": 2.00, "unit": "MJ/m³/K" },
+    "thermalConductivity": { "value": 2.0,  "unit": "W/m/K" },
+    "porosity":            { "value": 0.2,  "unit": "1" },
+    "modelType":           { "value": 1,    "unit": "1" },
+    "temperature":         { "value": 12,   "unit": "°C" }
+  },
+
+  "groundwater": {
+    "density":             { "value": 997,  "unit": "kg/m³" },
+    "specificHeat":        { "value": 4190, "unit": "J/kg/K" },
+    "thermalConductivity": { "value": 0.598,"unit": "W/m/K" },
+    "velocityX":           { "value": 2,   "unit": "cm/day" },
+    "velocityY":           { "value": 0,    "unit": "cm/day" }
+  },
+
+  "air": {
+    "heatCapacityDensity": { "value": 1.2,  "unit": "kJ/m³/K" },
+    "thermalConductivity": { "value": 0.02, "unit": "W/m/K" }
+  },
+
+  "power": {
+    "coefficientA": { "value": 5.5,  "unit": "W/m" },
+    "coefficientB": { "value": 50,   "unit": "W/m" },
+    "pipeRadius":   { "value": 0.09, "unit": "m" },
+    "efficiency":   { "value": 0.6,  "unit": "1" }
+  }
+}
+
+

@@ -1,0 +1,129 @@
+{
+  "version": "2",
+  "useMode": "local",
+  "meshMode": [
+    "hexa",
+    1
+  ],
+  "enableConvection": true,
+  "temperatureAbsolute": {
+    "value": 273.15,
+    "unit": "K"
+  },
+  "temperatureHot": {
+    "value": 313.15,
+    "unit": "K"
+  },
+  "mesh": {
+    "meshFactor": {
+      "value": 1.0,
+      "unit": "m"
+    },
+    "meshFine": {
+      "value": 0.25,
+      "unit": "m"
+    },
+    "boreholeDistance": {
+      "value": 5.0,
+      "unit": "m"
+    },
+    "xLength": {
+      "value": 400.0,
+      "unit": "m"
+    },
+    "yLength": {
+      "value": 200.0,
+      "unit": "m"
+    },
+    "xCenter": {
+      "value": -100.0,
+      "unit": "m"
+    },
+    "yCenter": {
+      "value": 0.0,
+      "unit": "m"
+    }
+  },
+  "time": {
+    "timeStepHours": {
+      "value": 86400.0,
+      "unit": "s"
+    },
+    "simulationYears": {
+      "value": 630720000.0,
+      "unit": "s"
+    }
+  },
+  "ground": {
+    "heatCapacityDensity": {
+      "value": 2000000.0,
+      "unit": "J/m^3/K"
+    },
+    "thermalConductivity": {
+      "value": 2.0,
+      "unit": "W/m/K"
+    },
+    "porosity": {
+      "value": 0.2,
+      "unit": "1"
+    },
+    "modelType": {
+      "value": 1.0,
+      "unit": "1"
+    },
+    "temperature": {
+      "value": 285.15,
+      "unit": "K"
+    }
+  },
+  "groundwater": {
+    "density": {
+      "value": 997.0,
+      "unit": "kg/m^3"
+    },
+    "specificHeat": {
+      "value": 4190.0,
+      "unit": "J/kg/K"
+    },
+    "thermalConductivity": {
+      "value": 0.598,
+      "unit": "W/m/K"
+    },
+    "velocityX": {
+      "value": 2.3148148148148148e-07,
+      "unit": "m/s"
+    },
+    "velocityY": {
+      "value": 0.0,
+      "unit": "m/s"
+    }
+  },
+  "air": {
+    "heatCapacityDensity": {
+      "value": 1200.0,
+      "unit": "J/m^3/K"
+    },
+    "thermalConductivity": {
+      "value": 0.02,
+      "unit": "W/m/K"
+    }
+  },
+  "power": {
+    "coefficientA": {
+      "value": 5.5,
+      "unit": "W/m"
+    },
+    "coefficientB": {
+      "value": 50.0,
+      "unit": "W/m"
+    },
+    "pipeRadius": {
+      "value": 0.09,
+      "unit": "m"
+    },
+    "efficiency": {
+      "value": 0.6,
+      "unit": "1"
+    }
+  }
+}

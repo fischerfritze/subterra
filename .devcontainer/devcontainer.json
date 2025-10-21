@@ -1,0 +1,18 @@
+{
+  "name": "SubTerra (refactored)",
+  "image": "fischerfritze/subterra:v2",
+  "remoteUser": "root",
+  "containerEnv": {
+    "PETSC_DIR": "/usr/local/petsc",
+    "PETSC_ARCH": "linux-gnu-real-32",
+    "SLEPC_DIR": "/usr/local/slepc",
+    "OPENBLAS_NUM_THREADS": "1",
+    "OPENBLAS_VERBOSE": "0",
+    "DEB_PYTHON_INSTALL_LAYOUT": "deb_system"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": ["ms-python.python", "ms-toolsai.jupyter", "ms-azuretools.vscode-docker"]
+    }
+  }
+}
