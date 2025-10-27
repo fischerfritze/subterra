@@ -1,5 +1,5 @@
 import numpy as np
-from src.paths import RESULTS_DIR, PARAMETER_FILE, TEMP_DIR, BASE_DIR 
+from src.simulation.utils.paths import RESULTS_DIR, PARAMETER_FILE, TEMP_DIR, BASE_DIR
 from scipy.integrate import simps
 import os
 
@@ -27,8 +27,9 @@ def multiple_powerprofile(years: int, A: float, B: float):
     days = np.arange(1, total_days + 1, dtype=int)
     resulting_power = np.tile(base_vals, years)
 
-    # geordnetes Dict 
-    powerprofile_multi = {int(d): float(v) for d, v in zip(days, resulting_power)}
+    # geordnetes Dict
+    powerprofile_multi = {int(d): float(v)
+                          for d, v in zip(days, resulting_power)}
 
     # Positive/Negative Anteile
     positive_integral = np.clip(resulting_power, 0.0, None)
@@ -44,7 +45,7 @@ def multiple_powerprofile(years: int, A: float, B: float):
     Q_in *= 24 / 1000
     Q_out *= 24 / 1000
 
-    # Ergebnisse ausgeben 
+    # Ergebnisse ausgeben
     print(f"Q_in  = {Q_in:.0f} kWh m⁻¹")
     print(f"Q_out = {Q_out:.0f} kWh m⁻¹")
     print(f"eta   = {ratio:.2f}")

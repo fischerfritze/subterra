@@ -6,18 +6,21 @@ import json
 
 from box import Box
 from fenics import Point
-from src.paths import RESULTS_DIR, PARAMETER_FILE, PARAMETER_FILE_SI, TEMP_DIR, BASE_DIR 
+from src.simulation.utils.paths import PARAMETER_FILE_SI, TEMP_DIR
+
 
 def generate_mesh(mode, x_0, y_0, distance):
     print("--------------------------------------------------------------------")
     if mode[0] == 'hexa':
-        locations, EWS_dict = generate_hexa_ews(x_b0=x_0, y_b0=y_0, d=distance, rings =mode[1]) 
+        locations, EWS_dict = generate_hexa_ews(
+            x_b0=x_0, y_b0=y_0, d=distance, rings=mode[1])
         meshing(EWS_dict)
 
         return locations
-        
+
     elif mode[0] == 'square':
-        locations, EWS_dict = generate_square_ews(x_b0=x_0, y_b0=y_0, d=distance, rings =mode[1]) 
+        locations, EWS_dict = generate_square_ews(
+            x_b0=x_0, y_b0=y_0, d=distance, rings=mode[1])
         meshing(EWS_dict)
 
         return locations
@@ -25,52 +28,55 @@ def generate_mesh(mode, x_0, y_0, distance):
     else:
         raise ValueError(f"Unknown mode: {mode}")
 
+
 def generate_hexa_ews(x_b0, y_b0, d, rings):
     locations = []
     hexa_EWS = {}
-    
+
     # Schritt 1: Erstelle hexagonales Gitter mit ausreichend Punkten
     grid = {}
     index = 1
-    
+
     for q in range(-rings, rings + 1):
         for r in range(-rings, rings + 1):
-            s = -q - r  # Bedingung für hexagonale Koordinaten 
+            s = -q - r  # Bedingung für hexagonale Koordinaten
             if abs(s) <= rings:
                 x = x_b0 + d * (q + r / 2)
                 y = y_b0 + d * math.sqrt(3) / 2 * r
                 grid[f"BH{index:02d}"] = (x, y)
                 index += 1
-    
+
     # Schritt 2: Filtere Punkte außerhalb d * rings
     index = 1
-    for key, (x, y) in grid.items():
+    for _, (x, y) in grid.items():
         distance = math.sqrt((x - x_b0) ** 2 + (y - y_b0) ** 2)
         if distance <= rings * d:
             hexa_EWS[f"BH{index:02d}"] = (x, y)
             locations.append(Point(x, y))
             index += 1
-    
+
     return locations, hexa_EWS
+
 
 def generate_square_ews(x_b0, y_b0, d, rings):
     locations = []
     square_EWS = {}
-    
+
     index = 1
     for i in range(-rings, rings + 1):
         for j in range(-rings, rings + 1):
             x = x_b0 + i * d
             y = y_b0 + j * d
-            
+
             # Abstand zum Zentrum berechnen
             distance = max(abs(i), abs(j))
             if distance <= rings:
                 square_EWS[f"BH{index:02d}"] = (x, y)
                 locations.append(Point(x, y))
                 index += 1
-    
+
     return locations, square_EWS
+
 
 def geo_template_circles_alt(EWS_dict, ms, ms_fine, x_len, y_len, x_0, y_0, radius):
     num = len(EWS_dict)
@@ -82,22 +88,22 @@ def geo_template_circles_alt(EWS_dict, ms, ms_fine, x_len, y_len, x_0, y_0, radi
     point_entries = ""
     counter_point = 5
     counter_line = 5
-    for i, (key, coords) in enumerate(EWS_dict.items(), start=2):
+    for i, (_, coords) in enumerate(EWS_dict.items(), start=2):
         x, y = coords  # Directly unpack the tuple
         point_entries += f"Point({counter_point}) = {{{x}, {y}, 0, ms_fine}};\n    "
         start_point = counter_point
         start_line = counter_line
         for j in range(circle_num):
             angle = 2*np.pi/circle_num * j
-            point_entries += f"Point({counter_point+1}) = {{{x + radius*np.cos(angle)}, {y+ radius*np.sin(angle)}, 0, ms_fine}};\n    "
+            point_entries += f"Point({counter_point+1}) = {{{x + radius*np.cos(angle)}, {y + radius*np.sin(angle)}, 0, ms_fine}};\n    "
             counter_point += 1
 
         for k in range(circle_num-1):
-            point_entries +=f"Line({counter_line}) = {{{start_point + k + 1}, {start_point + k+2}}};\n    "
+            point_entries += f"Line({counter_line}) = {{{start_point + k + 1}, {start_point + k+2}}};\n    "
             counter_line += 1
 
-        point_entries +=f"Line({counter_line}) = {{{start_point + circle_num}, {start_point + 1}}};\n    "
-        point_entries +=f"Curve Loop({i}) = {{{start_line}:{counter_line}}};\n    "
+        point_entries += f"Line({counter_line}) = {{{start_point + circle_num}, {start_point + 1}}};\n    "
+        point_entries += f"Curve Loop({i}) = {{{start_line}:{counter_line}}};\n    "
         counter_point += 1
         counter_line += 1
 
@@ -149,21 +155,21 @@ def geo_template_circles_alt(EWS_dict, ms, ms_fine, x_len, y_len, x_0, y_0, radi
     Mesh.CharacteristicLengthMin = 1;
     Mesh.CharacteristicLengthMax = ms;
     """
-    
+
     return geo_template
 
-def geo_template_points(EWS_dict, ms, ms_fine, x_len, y_len, x_0, y_0, radius): 
+
+def geo_template_points(EWS_dict, ms, ms_fine, x_len, y_len, x_0, y_0, radius):
 
     num = len(EWS_dict)
     number_list = np.arange(5, 5+num, 1).tolist()
     number_list = "{" + ", ".join(map(str, number_list)) + "}"
-    
+
     # Initialize point entries based on the dictionary
     point_entries = ""
     for i, (key, coords) in enumerate(EWS_dict.items(), start=5):
         x, y = coords  # Directly unpack the tuple
         point_entries += f"    Point({i}) = {{{x}, {y}, 0, ms_fine}};\n"
-
 
     geo_template = f"""
     SetFactory("OpenCASCADE");
@@ -212,14 +218,16 @@ def geo_template_points(EWS_dict, ms, ms_fine, x_len, y_len, x_0, y_0, radius):
     Physical Curve("Boundary") = {{1, 2, 3, 4}};
     Physical Surface("Ground") = {{1}};
     """
-    
+
     return geo_template
+
 
 def geo_template_circles(EWS_dict, ms, ms_fine, x_len, y_len, x_0, y_0, radius):
     num = len(EWS_dict)
     number_list = np.arange(5, 5+num, 1).tolist()
     number_list = "{" + ", ".join(map(str, number_list)) + "}"
 
+    # TODO: Remove unused code
     # Initialize point entries based on the dictionary
     # circle_num = 12
     # point_entries = ""
@@ -243,6 +251,7 @@ def geo_template_circles(EWS_dict, ms, ms_fine, x_len, y_len, x_0, y_0, radius):
     #     point_entries +=f"Curve Loop({i}) = {{{start_line}:{counter_line}}};\n    "
     #     counter_point += 1
     #     counter_line += 1
+    
     cylinder_entries = ""
     counter_cylinder = 2
 
@@ -305,40 +314,41 @@ def geo_template_circles(EWS_dict, ms, ms_fine, x_len, y_len, x_0, y_0, radius):
     // Mesh settings
     Mesh.CharacteristicLengthMax = ms;
     """
-    
-    
+
     return geo_template
+
 
 def meshing(EWS_dict):
     with open(PARAMETER_FILE_SI, "r") as f:
         param = Box(json.load(f))
 
-    #Create the .geo file
+    # Create the .geo file
     template = geo_template_points(
         EWS_dict,
-        ms = param.mesh.meshFactor.value,
-        ms_fine = param.mesh.meshFine.value,
-        x_len = param.mesh.xLength.value / 2,
-        y_len = param.mesh.yLength.value / 2,
-        x_0 = param.mesh.xCenter.value,
-        y_0 = param.mesh.yCenter.value,
-        radius = param.power.pipeRadius.value
+        ms=param.mesh.meshFactor.value,
+        ms_fine=param.mesh.meshFine.value,
+        x_len=param.mesh.xLength.value / 2,
+        y_len=param.mesh.yLength.value / 2,
+        x_0=param.mesh.xCenter.value,
+        y_0=param.mesh.yCenter.value,
+        radius=param.power.pipeRadius.value
     )
 
-    #Write .geo file
+    # Write .geo file
     geo_file_name = TEMP_DIR + "/temp_mesh.geo"
     with open(geo_file_name, "w") as geo_file:
         geo_file.write(template)
 
-    #Run Gmsh
+    # Run Gmsh
     msh_file_name = TEMP_DIR + "temp_mesh.msh"  # Gmsh's default output file
-    subprocess.run(["gmsh", "-2", geo_file_name, "-o", msh_file_name, "-format", "msh2"])
+    subprocess.run(["gmsh", "-2", geo_file_name, "-o",
+                   msh_file_name, "-format", "msh2"])
 
-    #Convert mesh to XML
+    # Convert mesh to XML
     xml_file_name = TEMP_DIR + "/temp_mesh.xml"
     subprocess.run(["dolfin-convert", msh_file_name, xml_file_name])
 
-    #Clean up temporary files
+    # Clean up temporary files
     os.remove(geo_file_name)
     os.remove(msh_file_name)
 

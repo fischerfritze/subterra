@@ -1,16 +1,21 @@
-import os
-import h5py
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.tri as mtri
+from os import makedirs, path
 from typing import Optional, Tuple
-from src.paths import RESULTS_DIR, PARAMETER_FILE, PARAMETER_FILE_SI, TEMP_DIR, BASE_DIR, PARAMS_DIR
 
-def run_plotting(
+import matplotlib.pyplot as plt
+from h5py import File
+from matplotlib.tri import Triangulation
+from numpy import arange
+
+from src.simulation.utils.paths import (BASE_DIR, PARAMETER_FILE,
+                                        PARAMETER_FILE_SI, PARAMS_DIR,
+                                        RESULTS_DIR, TEMP_DIR)
+
+
+def plot(
     h5_path: str = "results/7EWS_κ = 2.0_630720000.0years/sim_20years.h5",
-    out_dir: str = "results/plots",
+    out_dir: str = "results/plots_svg",
     pattern: str = "T_vertex_",        # "T_dof_" wenn du DOF-Snapshots gespeichert hast
-    save_svg: bool = False,              # True: .svg, False: .png
+    save_svg: bool = True,              # True: .svg, False: .png
     dpi: int = 200,
 
     # >>> neue Parameter für Farbskala (in °C)
@@ -44,31 +49,33 @@ def run_plotting(
     if step_c <= 0:
         raise ValueError("step_c muss > 0 sein.")
 
-    os.makedirs(out_dir, exist_ok=True)
+    makedirs(out_dir, exist_ok=True)
 
     # --- Find snapshots ---
-    with h5py.File(h5_path, "r") as h5:
+    with File(h5_path, "r") as h5:
         if "snapshots" not in h5:
             raise FileNotFoundError(f"Keine 'snapshots'-Gruppe in {h5_path}")
         all_snaps = [k for k in h5["snapshots"].keys() if pattern in k]
     if not all_snaps:
-        raise FileNotFoundError(f"Keine Snapshots mit pattern '{pattern}' gefunden.")
+        raise FileNotFoundError(
+            f"Keine Snapshots mit pattern '{pattern}' gefunden.")
     all_snaps.sort()
 
     # --- fixed levels (°C) ---
-    levels_c = np.arange(vmin_c, vmax_c + step_c, step_c)
-    print(f"Farbskala: {vmin_c:.1f}–{vmax_c:.1f} °C in {step_c:.1f}°C-Schritten (Levels={len(levels_c)})")
+    levels_c = arange(vmin_c, vmax_c + step_c, step_c)
+    print(
+        f"Farbskala: {vmin_c:.1f}–{vmax_c:.1f} °C in {step_c:.1f}°C-Schritten (Levels={len(levels_c)})")
 
     saved = []
     for snap in all_snaps:
-        with h5py.File(h5_path, "r") as h5:
+        with File(h5_path, "r") as h5:
             g = h5[f"snapshots/{snap}"]
             kind = g.attrs.get("kind", "vertex")
             title = g.attrs.get("time_label", snap)
 
             if kind == "vertex":
                 coords = g["coords"][...]
-                cells  = g["cells"][...] if "cells" in g else None
+                cells = g["cells"][...] if "cells" in g else None
                 values = g["values"][...] - 273.15  # K → °C
                 x, y = coords[:, 0], coords[:, 1]
             elif kind == "dof":
@@ -79,7 +86,8 @@ def run_plotting(
             else:
                 raise ValueError(f"Unbekannter Snapshot-Typ: {kind}")
 
-        triang = mtri.Triangulation(x, y, cells) if cells is not None else mtri.Triangulation(x, y)
+        triang = Triangulation(
+            x, y, cells) if cells is not None else Triangulation(x, y)
 
         plt.figure(figsize=(7, 5))
     # Filled contours
@@ -117,7 +125,7 @@ def run_plotting(
 
         # Speichern
         ext = "svg" if save_svg else "png"
-        out_path = os.path.join(out_dir, f"{snap}.{ext}")
+        out_path = path.join(out_dir, f"{snap}.{ext}")
         plt.savefig(out_path, format=ext, dpi=dpi, bbox_inches="tight")
         plt.close()
         saved.append(out_path)
