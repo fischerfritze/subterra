@@ -14,10 +14,13 @@ dist/
 *.log
 **/.ipynb_checkpoints/
 
-# Große/erzeugte Ordner (anpassen!)
-results/
-meshes/
+
 
 # Secrets/Env
 .env
 .env.*
+
+# Subterra
+results/
+meshes/
+params/temp/
