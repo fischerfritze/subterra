@@ -21,15 +21,17 @@ Nutzung:
 """
 
 import json
-import math
 import re
 import sys
-from typing import Any, Dict, Tuple
+import os
+
+from typing import Any, Tuple
 
 SUPERSCRIPT_MAP = {
     "²": "^2",
     "³": "^3",
 }
+
 
 def normalize_unit(u: str) -> str:
     if not isinstance(u, str):
@@ -53,6 +55,7 @@ def normalize_unit(u: str) -> str:
     s = re.sub(r"(?i)hours?", "h", s)
     s = re.sub(r"(?i)hr?s?", "h", s)
     return s
+
 
 def convert_value_unit(value: float, unit: str) -> Tuple[float, str]:
     """
@@ -122,7 +125,8 @@ def convert_value_unit(value: float, unit: str) -> Tuple[float, str]:
     # Fallback: unbekannte Einheit – unverändert zurückgeben
     return value, unit
 
-def convert_object(obj: Any) -> Any:
+
+def convert_to_si(obj: Any) -> Any:
     """
     Durchläuft das Objekt rekursiv und konvertiert alle {value, unit}-Paare.
     """
@@ -131,36 +135,52 @@ def convert_object(obj: Any) -> Any:
         if set(obj.keys()) >= {"value", "unit"} and isinstance(obj["unit"], (str, int, float)):
             val = obj.get("value")
             unit = obj.get("unit")
+            
+            if not val or not unit:
+                return obj
+
             try:
                 v_si, u_si = convert_value_unit(float(val), str(unit))
                 return {"value": v_si, "unit": u_si}
             except Exception:
                 # Wenn die Konvertierung fehlschlägt, original zurückgeben
                 return obj
+    
         else:
-            return {k: convert_object(v) for k, v in obj.items()}
+            return {k: convert_to_si(v) for k, v in obj.items()}
+    
     elif isinstance(obj, list):
-        return [convert_object(v) for v in obj]
+        return [convert_to_si(v) for v in obj]
+    
     else:
         return obj
 
-def main():
-    if len(sys.argv) < 2:
-        print("Nutzung: python convert_to_si.py input.json [output.json]", file=sys.stderr)
-        sys.exit(1)
-    in_path = sys.argv[1]
-    out_path = sys.argv[2] if len(sys.argv) >= 3 else None
 
+if __name__ == "__main__":
+
+    # Parse command line arguments
+    if len(sys.argv) < 2:
+        print("Nutzung: python convert_to_si.py input.json [output.json]")
+        raise SystemExit("Isnufficient arguments.")
+    
+    in_path = sys.argv[1]
+    if len(sys.argv) >= 3:
+        out_path = sys.argv[2]
+    else:
+        out_path = None
+
+    # Parse input file
+    if not os.path.exists(in_path):
+        raise FileNotFoundError(f"File not found: {in_path}")
     with open(in_path, "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    converted = convert_object(data)
+    # Perform conversion to SI
+    result = convert_to_si(in_path)
 
+    # Write output if a path is given, else print to STDOUT
     if out_path:
-        with open(out_path, "w", encoding="utf-8") as f:
-            json.dump(converted, f, ensure_ascii=False, indent=2)
+        with open(out_path, "w+", encoding="utf-8") as f:
+            json.dump(result, f, ensure_ascii=False, indent=2)
     else:
-        print(json.dumps(converted, ensure_ascii=False, indent=2))
-
-if __name__ == "__main__":
-    main()
+        print(json.dumps(result, ensure_ascii=False, indent=2))
