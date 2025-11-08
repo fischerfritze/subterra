@@ -138,6 +138,9 @@ class H5Writer:
     def add_vertex_snapshot(self, name: str, arr: np.ndarray):
         self.snapshots.create_dataset(name, data=np.asarray(arr), compression="lzf", chunks=True)
 
+    def set_metadata(self, key: str, value):
+         self.h5.attrs[key] = value
+
     def close(self):
         self.h5.flush()
         self.h5.close()
