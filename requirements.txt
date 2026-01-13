@@ -14,11 +14,6 @@ Cython==0.29.32
 decorator==4.4.2
 exceptiongroup==1.2.1
 executing==2.0.1
-fenics-dijitso @ file:///src/dijitso
-fenics-dolfin @ file:///src/dolfin/python
-fenics-ffc @ file:///src/ffc
-fenics-fiat @ file:///src/fiat
-fenics-ufl-legacy @ file:///src/ufl-legacy
 fonttools==4.29.1
 fs==2.4.12
 gast==0.5.2
@@ -44,7 +39,6 @@ numpy==1.21.5
 olefile==0.46
 packaging==21.3
 parso==0.8.4
-petsc4py @ file:///usr/local/petsc/src/binding/petsc4py
 pexpect==4.9.0
 Pillow==9.0.1
 pkgconfig==1.5.5
@@ -71,7 +65,6 @@ rich==13.7.1
 scipy==1.8.0
 scooby==0.10.0
 six==1.16.0
-slepc4py @ file:///usr/local/slepc/src/binding/slepc4py
 soupsieve==2.3.1
 stack-data==0.6.3
 sympy==1.9
