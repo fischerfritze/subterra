@@ -1,123 +1,106 @@
-# SubTerra (refactored)
+# SubTerra
+A Python-based toolkit for two dimensional simulations of borehole thermal energy storage (BTES) using FEniCS. For the calculation with groundwater flow, the heat transport equation is be solved:
+$$
+\frac{\partial T}{\partial t}- a_{\mathrm{eff}} \, \Delta T+ b \, (\vec{v}\cdot \nabla T)= \frac{f}{(\rho c)_{\mathrm{g}}},
+$$
 
-A small, self-contained toolkit for steady / transient thermal simulations in subsurface geometries. This refactored version extracts core utilities for mesh handling, parameter conversion, calculation, plotting and HDF5 results writing. The project focuses on producing power profiles and temperature fields for simple engineered geological systems.
+$$
+a_{\mathrm{eff}} = \left( \frac{\kappa}{\rho c} \right)_{\mathrm{eff}}, \ \ \ \ \ \ \ \ \ b = n_{\mathrm{p}} \frac{(\rho c)_{\mathrm{w}}}{(\rho c)_{\mathrm{g}}}.
+$$
 
-This README covers quick setup, running common tasks, input parameter conventions, and the repository layout.
+**Key features:**
+- FEniCS-based thermal simulations with custom geometries
 
-## Quick facts
 
-- Language: Python 3.10+ (tested in the provided dev container)
-- Purpose: run thermal subsurface calculations and export results as HDF5 and CSV for plotting
-- Key outputs: HDF5 simulations in `results/` and a multi-profile CSV at `results/powerprofile_multi.csv`
+## Prerequisites
 
-## Install
+This project requires FEniCS, gmsh, and other scientific computing libraries that are difficult to install natively. **Using the provided Docker container is strongly recommended.**
 
-1. Create and activate a Python virtual environment (recommended):
+## Setup with Docker Container
 
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install --upgrade pip
-```
+### Build Docker Image
 
-2. Install dependencies from the top-level `requirements.txt` (provided in the original workspace root). If you only need the refactored package, install requirements listed in that file or use the system's package manager.
+1. **Build the image:**
+   ```bash
+   docker build -t subterra:local .
+   ```
 
-```bash
-pip install -r ../requirements.txt
-```
+2. **Run the container:**
+   ```bash
+   docker run -it -v $(pwd):/home/SubTerra subterra:local /bin/bash
+   ```
 
-Note: if you run into system-level compiled dependency issues (e.g., MPI / FEniCS), consider running in the provided Docker/dev container or using prebuilt wheels suited to your platform.
+3. **Inside the container, run your simulations** (see Usage section below)
 
-## Run the main example
-
-There is a small top-level runner that demonstrates end-to-end usage.
-
-```bash
-cd /home/SubTerra_refactored
-python3 main.py
-```
-
-This will execute a sequence of calculations and write results to `results/`. Several example HDF5 files are included under `results/` (e.g. `7EWS_.../sim_1years.h5`), as well as a `powerprofile_multi.csv` produced by the power profile utilities.
-
-## Core modules
-
-The refactored code is in the `src/` package. Key modules:
-
-- `src/mesh.py` — utilities for mesh loading and simple mesh helpers.
-- `src/convert_to_si.py` — helper functions to convert parameters to SI units.
-- `src/calculation.py` — the main physics and simulation orchestration.
-- `src/h5py_writer.py` — writing simulation outputs to HDF5 for later analysis/plotting.
-- `src/powerprofile.py` — compute and export power profiles (CSV used in `results/`).
-- `src/plot.py` — simple plotting helpers to generate the `results/plots/*` images.
-- `src/paths.py` — central paths and IO helpers used across the package.
-- `src/tools.py` — utility functions shared across modules.
-
-## Parameters and meshes
-
-Example parameter JSON files are in `params/`:
-
-- `params/parameter.json` — default parameter set (unitless or domain-specific).
-- `params/parameter_si.json` — parameters already converted to SI.
-
-Meshes and temporary mesh files are in `meshes/` and `params/temp/` respectively. The project includes simple example mesh files for quick testing.
-
-## Results
-
-After running the examples you will find:
-
-- HDF5 simulation outputs under `results/<case>/sim_*.h5`.
-- A combined CSV of power profiles at `results/powerprofile_multi.csv`.
-- Plots in `results/plots/` showing temperature fields for selected cases.
-
-You can inspect HDF5 files with standard viewers (e.g., `h5py` in Python) or use the plotting utilities in `src/plot.py`.
-
-## Tests
-
-There is a `tests/` folder prepared for unit and integration tests. Run tests with your preferred test runner (e.g., `pytest`).
-
-```bash
-pip install pytest
-pytest -q
-```
-
-## Development notes
-
-- The refactored package aims to be small and easy to reuse in other projects. Import the package by adding the repo root to `PYTHONPATH` or installing it in editable mode.
-
-```bash
-pip install -e .
-```
-
-- If you need platform-specific support (MPI, FEniCS) use the project's Docker setup in the original workspace root (`Dockerfile`, `docker_*` helpers).
-
-## File tree (important files)
+## Project Structure
 
 ```
-SubTerra_refactored/
-├─ main.py                 # top-level runner that uses src/ to run examples
-├─ params/                 # JSON parameter sets and temp mesh fragments
-│  ├─ parameter.json
-│  └─ parameter_si.json
-├─ results/                # output HDF5, CSV and plots
-├─ src/                    # refactored Python package (calculation, IO, plotting)
-└─ README.md               # this file
+subterra-1/
+├── Dockerfile              # Docker image definition (based on fenics-gmsh)
+├── .devcontainer/          # VS Code dev container configuration
+│   └── devcontainer.json
+├── main.py                 # Main entry point for simulations
+├── requirements.txt        # Python dependencies
+├── params/                 # Parameter files
+│   ├── parameter.json      # Input parameters (domain-specific units)
+│   ├── parameter_si.json   # Auto-generated SI units
+│   └── temp/               # Temporary mesh files
+├── src/                    # Core Python package
+│   ├── calculation.py      # Main simulation logic and FEniCS solver
+│   ├── convert_to_si.py    # Parameter unit conversion
+│   ├── h5py_writer.py      # HDF5 result export
+│   ├── mesh.py             # Mesh handling utilities
+│   ├── plot.py             # Visualization functions
+│   ├── powerprofile.py     # Power profile calculations
+│   ├── paths.py            # Path management
+│   └── tools.py            # Helper functions
+└── results/                # Output directory (created at runtime)
 ```
 
-## Contact / License
+## Usage
 
-This repository is provided as-is for research and demonstration. Add license and contact details as appropriate for your project.
+### Input Parameters
 
-## Troubleshooting
+Edit `params/parameter.json` to configure your simulation:
+- Geometry parameters
+- Material properties (thermal conductivity, heat capacity)
+- Boundary conditions
+- Time stepping parameters
 
-- If Python raises ImportError for compiled dependencies, first try the dev container or Docker image included in the original workspace.
-- For numerical differences vs. the original codebase, ensure the same parameter sets and mesh files are used (see `params/` and `meshes/`).
+### Output
 
-If you'd like, I can also:
+After running simulations, you'll find:
+- **HDF5 files**: `results/<case_name>/sim_<time>.h5` — Full simulation state with temperature fields
+- **CSV files**: Power profiles and other derived quantities
+- **Plots**: Temperature field visualizations (if plotting is enabled)
 
-- Add a minimal CLI for running specific parameter sets.
-- Add an example Jupyter notebook that loads HDF5 output and renders plots.
+### Viewing Results
+
+Inspect HDF5 files with Python:
+```python
+import h5py
+with h5py.File('results/your_simulation/sim_20years.h5', 'r') as f:
+    print(list(f.keys()))
+```
+
+Or use the built-in plotting utilities in `src/plot.py`.
+
+## Key Dependencies
+
+See `requirements.txt` for the complete list.
+
+## License
+
+**SubTerra: Copyright, license, and disclaimer of warranty**
+
+See COPYING for copyright and a list of contributors.
+
+SubTerra is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+
+SubTerra is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with this program. If not, see https://www.gnu.org/licenses/.
 
 ---
 
-README last updated: automated by the refactor helper
-This is the how it goes!
+**Last updated:** January 2026
