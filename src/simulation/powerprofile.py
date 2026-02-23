@@ -21,7 +21,6 @@ def multiple_powerprofile(years: int, A: float, B: float):
     # Basis-Jahresprofil
     dict_year = powerprofile(A, B)
 
-    # vektorisiert über mehrere Jahre erweitern
     base_vals = np.array(list(dict_year.values()), dtype=float)  # Länge 365
     total_days = years * 365
     days = np.arange(1, total_days + 1, dtype=int)

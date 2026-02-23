@@ -14,20 +14,20 @@ from src.simulation.utils.paths import (BASE_DIR, PARAMETER_FILE,
 def plot(
     h5_path: str = "results/7EWS_κ = 2.0_630720000.0years/sim_20years.h5",
     out_dir: str = "results/plots_svg",
-    pattern: str = "T_vertex_",        # "T_dof_" wenn du DOF-Snapshots gespeichert hast
+    pattern: str = "T_vertex_",        
     save_svg: bool = True,              # True: .svg, False: .png
     dpi: int = 200,
 
-    # >>> neue Parameter für Farbskala (in °C)
+    # >>> new Parameter for contour (in °C)
     vmin_c: float = 5.0,
     vmax_c: float = 25.0,
     step_c: float = 1.0,
 
-    # >>> neue Parameter für Achsenbereiche (None = automatisch)
+    # >>> new parameter for axis
     x_range: Optional[Tuple[float, float]] = None,   # z.B. (0.0, 50.0)
     y_range: Optional[Tuple[float, float]] = None,   # z.B. (0.0, 30.0)
 
-    # Optik
+    # optic
     cmap: str = "cividis",
     line_color: str = "k",
     line_width: float = 0.4,
@@ -43,7 +43,7 @@ def plot(
 
     Returns: list of generated file paths.
     """
-    # --- Validation ---
+    # validation
     if vmax_c <= vmin_c:
         raise ValueError("vmax_c muss > vmin_c sein.")
     if step_c <= 0:
@@ -51,7 +51,7 @@ def plot(
 
     makedirs(out_dir, exist_ok=True)
 
-    # --- Find snapshots ---
+    # find snapshots
     with File(h5_path, "r") as h5:
         if "snapshots" not in h5:
             raise FileNotFoundError(f"Keine 'snapshots'-Gruppe in {h5_path}")
@@ -61,7 +61,7 @@ def plot(
             f"Keine Snapshots mit pattern '{pattern}' gefunden.")
     all_snaps.sort()
 
-    # --- fixed levels (°C) ---
+    # fixed levels (°C) 
     levels_c = arange(vmin_c, vmax_c + step_c, step_c)
     print(
         f"Farbskala: {vmin_c:.1f}–{vmax_c:.1f} °C in {step_c:.1f}°C-Schritten (Levels={len(levels_c)})")
@@ -90,7 +90,7 @@ def plot(
             x, y, cells) if cells is not None else Triangulation(x, y)
 
         plt.figure(figsize=(7, 5))
-    # Filled contours
+    # filled contours
         cf = plt.tricontourf(
             triang,
             values,
@@ -100,7 +100,7 @@ def plot(
             cmap=cmap,
             extend="both"
         )
-    # Contour lines
+    # contour lines
         cl = plt.tricontour(
             triang,
             values,
@@ -111,7 +111,7 @@ def plot(
         )
         plt.clabel(cl, inline=True, fontsize=label_fontsize, fmt="%.0f°C")
 
-    # Axes
+    # axes
         if x_range is not None:
             plt.xlim(*x_range)
         if y_range is not None:
@@ -123,7 +123,7 @@ def plot(
         plt.title(f"{title} — Temperaturfeld")
         plt.tight_layout()
 
-        # Speichern
+        # save
         ext = "svg" if save_svg else "png"
         out_path = path.join(out_dir, f"{snap}.{ext}")
         plt.savefig(out_path, format=ext, dpi=dpi, bbox_inches="tight")

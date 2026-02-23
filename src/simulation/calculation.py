@@ -19,14 +19,14 @@ from src.convert_to_si import convert_to_si
 
 def run_calculation():
 
-    # SI-conversion of parameter file (direct call instead of subprocess)
+    # SI-conversion of parameter file
     try:
         convert_to_si(PARAMETER_FILE, PARAMETER_FILE_SI)
         print(f"SI-Konvertierung erfolgreich: {PARAMETER_FILE_SI}")
     except Exception as e:
         print(f"Fehler bei der SI-Konvertierung: {e}")
 
-    # Load JSON with Box allowing attribute based access
+    # load JSON data
     with open(PARAMETER_FILE_SI, "r") as f:
         params_si = Box(json.load(f))
     with open(PARAMETER_FILE, "r") as f:
@@ -47,14 +47,14 @@ def _run_calculation(params: Box, params_si: Box):
     print(f"Starting calculation with parameters from {PARAMETER_FILE_SI}")
 
     # TODO: Remove unused variables
-    # Create powerprofile: A - B * cos(2 * pi / 365 * days)
+    # create powerprofile: A - B * cos(2 * pi / 365 * days)
     powerprofile, eta, Q_out, Q_in = pp.multiple_powerprofile(
         A=params_si.power.coefficientA.value,
         B=params_si.power.coefficientB.value,
         years=params.time.simulationYears.value
     )
 
-    # Create meshgrid
+    # create meshgrid
     locations = msh.generate_mesh(
         mode=tuple(params_si.meshMode),
         x_0=params_si.mesh.xCenter.value,
@@ -71,21 +71,21 @@ def _run_calculation(params: Box, params_si: Box):
     ### Create FEniCS objects ###
     #############################
 
-    # Create function space:
+    # create function space
     V_space = fenics.FunctionSpace(
         mesh,
         "Lagrange",
         1
     )
 
-    # TODO: Remove unused variable
+    # create vector space
     Vec_space = fenics.VectorFunctionSpace(
         mesh,
         "Lagrange",
         1
     )
 
-    # Create boundary conditions: T = T_0 on boundary
+    # create boundary conditions: T = T_0 on boundary
     boundary_condition = fenics.DirichletBC(
         V_space,
         params_si.ground.temperature.value,
@@ -93,7 +93,7 @@ def _run_calculation(params: Box, params_si: Box):
         1
     )
 
-    # Create initial conditions: T = T_0 at t = 0
+    # create initial conditions: T = T_0 at t = 0
     initial_condition = fenics.Expression(
         "T_0",
         degree=1,
@@ -102,14 +102,14 @@ def _run_calculation(params: Box, params_si: Box):
 
     T_1 = fenics.interpolate(initial_condition, V_space)
 
-    # Trial and test functions:
+    # trial and test functions:
     T_trial = fenics.TrialFunction(V_space)
     v_test = fenics.TestFunction(V_space)
 
-    # Temperature function at new time step:
+    # temperature function:
     T = fenics.Function(V_space)
 
-    # Normal vector:
+    # normal vector:
     n_vector = fenics.FacetNormal(mesh)
 
     #########################
@@ -122,7 +122,7 @@ def _run_calculation(params: Box, params_si: Box):
                            params_si.groundwater.velocityY.value)
 
         if params_si.ground.porosity.value != 0.0:
-            # Weighted Parameters
+            # weighted Parameters
             thermalConductivity, heatCapacityDensity = weighted_parameter(
                 model=params_si.ground.modelType.value,
                 ground_parameter=[
@@ -219,10 +219,9 @@ def _run_calculation(params: Box, params_si: Box):
     time_steps = int(params_si.time.simulationYears.value /
                      params_si.time.timeStepHours.value)
 
-    # TODO: Remove unused variable
     keys = [f'COP_b{i}' for i in range(n_EWS)]
 
-    # HDF5-Writer anlegen (Dateipfad nach Wunsch)
+    # HDF5-Writer
     writer = H5Writer(path=f"{base_folder}/sim_{params.time.simulationYears.value}years.h5",
                       n_EWS=n_EWS, compression="lzf", flush_every=365)
 
@@ -232,11 +231,9 @@ def _run_calculation(params: Box, params_si: Box):
         E_probe_sum = 0.0
 
         while time_step <= time_steps:
-            # CPU und RAM auslastung abfragen
+            # show CPU and RAM
             cpu = cpu_percent(interval=0.0)
             ram = virtual_memory().percent
-
-            # Zusatztext im Fortschrittsbalken aktualisieren
             bar.text(f'(CPU: {cpu:.1f}%, RAM: {ram:.1f}%)')
 
             Q_dict = powerprofile.get(time_step)
@@ -253,14 +250,14 @@ def _run_calculation(params: Box, params_si: Box):
                 f_Q.apply(b)
             boundary_condition.apply(b)
 
-            # Lösen
+            # solve
             solver.solve(A_matrix, T.vector(), b)
 
-            # Randfluss (ggf. ausdünnen, falls teuer)
+            # flux
             flux_boundary = fenics.assemble(-thermalConductivity *
                                             fenics.dot(fenics.nabla_grad(T), n_vector) * fenics.ds)
 
-            # --- pro EWS: Temperatur & elektrische Energie (als Zeilenvektoren) ---
+            # for every EWS/BHE
             r_EWS = params_si.power.pipeRadius.value
             Temp_EWS_row = np.empty(n_EWS, dtype=np.float32)
             W_el_row = np.empty(n_EWS, dtype=np.float32)
@@ -268,7 +265,7 @@ def _run_calculation(params: Box, params_si: Box):
             for i in range(n_EWS):
                 x = locations[i].x()
                 y = locations[i].y()
-                # 4-Punkt-Mittel
+                # average
                 T_EWS = float(np.average([
                     T(fenics.Point(x - r_EWS, y)),
                     T(fenics.Point(x + r_EWS, y)),
@@ -284,8 +281,7 @@ def _run_calculation(params: Box, params_si: Box):
                     delta_t=params_si.time.timeStepHours.value,
                     gamma=params_si.power.efficiency.value
                 )
-            # Q: float, T : float, T_H: float, delta_t: float, gamma: float
-            # --- Energiemengen / Fehler ---
+            # conversion of energy
             E_ground_i = fenics.assemble(heatCapacityDensity * T_1 * fenics.dx) - \
                 fenics.assemble(heatCapacityDensity * T * fenics.dx)
             E_flux_i = - params_si.time.timeStepHours.value * flux_boundary
@@ -293,7 +289,7 @@ def _run_calculation(params: Box, params_si: Box):
 
             error_i = E_ground_i + E_flux_i + E_probe_i
 
-            # --- Schrittwerte in HDF5 (keine Python-Listen mehr) ---
+            # save to HDF5
             writer.append_step(
                 day=time_step,
                 error=error_i / (3600.0 * 1000.0),
@@ -307,12 +303,11 @@ def _run_calculation(params: Box, params_si: Box):
                 Temp_EWS_row=Temp_EWS_row
             )
 
-            # Zustand updaten
             T_1.assign(T)
             total_flux += E_flux_i
             E_probe_sum += E_probe_i
 
-            # # Snapshots (selten): Vertex-Feld einmalig speichern
+            # create snapshots
             if time_step in [365 * 1, 365 * 10, 365 * 20, 365 * 30, 365 * 40]:
                 t_between = time_step / 365.0
 

@@ -43,7 +43,7 @@ $$
 - The *heat utilization rate* $\eta$ is the ratio of extracted heat over stored heat determined by <br>
    $q(t)  = A - B \cos \left( \frac{2 \pi}  {t_\mathrm{year}} \cdot t \right) \Rightarrow \eta = \frac{Q_\mathrm{out}}{Q_\mathrm{in}}$
 <p align="center">
-  <img src="powerprofile-1.png" width="600">
+  <img src="figures/powerprofile.png" width="600">
 </p>
 
 **Numerical checks:**
@@ -121,7 +121,7 @@ After running simulations:
 - **COP-values**: based on the tempeature field and the input parameter every single BHE and the overall COP is estimated.
 - **Plots**: Temperature field visualizations (if plotting is enabled)
 <p align="center">
-  <img src="example_result-1.png" width="600">
+  <img src="figures/example_result.png" width="600">
 </p>
 
 Numerically computed 1D temperature profiles for different time steps 
