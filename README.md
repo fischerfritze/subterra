@@ -25,7 +25,7 @@ This project requires FEniCS, gmsh and more.
 
 > [TODO](#TODO): Should speify 'groundwater flow calculation' before using the term
 
-A Python-based toolkit for two dimensional simulations of borehole thermal energy storage (BTES) with finite elments using FEniCS [1]. For the calculation with groundwater flow, the heat transport equation is be solved:
+A Python-based toolkit for two dimensional simulations of borehole thermal energy storage (BTES) with finite elments using FEniCS [^1]. For the calculation with groundwater flow, the heat transport equation is be solved:
 
 $$
 \frac{\partial T}{\partial t}- a_{\mathrm{eff}}  \Delta T+ b  (\mathbf{v}\cdot \nabla T)= \frac{f}{(\rho c)_{\mathrm{g}}},
@@ -192,7 +192,7 @@ with h5py.File('results/your_simulation/sim_20years.h5', 'r') as f:
 
 ## Litature
 
-1. Alnaes, M. S., et al. (2015). The FEniCS Project Version 1.5. *Archive of Numerical Software, 3*.
+[^1] Alnaes, M. S., et al. (2015). The FEniCS Project Version 1.5. *Archive of Numerical Software, 3*.
 
 2. Kobus, H. (1992). Schadstoffe im Grundwasser. Wärme- und Schadstofftransport im Grundwasser. In H. Kobus (Hrsg.), *Wärme- und Schadstofftransport im Grundwasser*. Weinheim: VCH.
    
