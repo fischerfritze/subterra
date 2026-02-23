@@ -39,13 +39,15 @@ $$
 
 - Both media (water, ground) are assumed to have *similar temperatures*:   $T_\mathrm{w} = T_\mathrm{g}$ [2].
 - Vertical groundwater flow and pressure effects are neglected; water density $\rho_w$ is *temperature-independent* [2] 
-- The soil is assumed *homogeneous* and *isotropic* with respect to $\kappa_g$ and $(\rho c)_g$.
+- The soil is *homogeneous* and *isotropic* with respect to $\kappa_g$ and $(\rho c)_g$.
 - The terrestrial heat flux ($\approx 65 \text{mWm}^{-2}$) is negligible relative to the BHE heat rate.
 - The individual BHEs are modeled using the FEniCS `PointSource()` function with time-dependent heat flux: $f(t, \mathbf{r}) = q(t)\sum_j \delta(\mathbf{r}-\mathbf{r}_j)$.
 - Assuming vertical symmetry, the numerical analysis can be reduced to *two dimensions*.
-- *Dirichlet boundary conditions* are assumed, where at great distance the ground temperature $T_0$ is kept constant.
-- The *heat utilization rate* $\eta$ is the ratio of extracted heat over stored heat determined by <br>
-   $q(t)  = A - B \cos \left( \frac{2 \pi}  {t_\mathrm{year}} \cdot t \right) \Rightarrow \eta = \frac{Q_\mathrm{out}}{Q_\mathrm{in}}$
+- *Dirichlet boundary conditions*, where at great distance the ground temperature $T_0$ is kept constant.
+- The *heat utilization rate* $\eta$ is the ratio of extracted heat over stored heat determined by:
+
+  $q(t)  = A - B \cos \left( \frac{2 \pi}  {t_\mathrm{year}} \cdot t \right) \Rightarrow \eta = \frac{Q_\mathrm{out}}{Q_\mathrm{in}}$
+
 <p align="center">
   <img src="figures/powerprofile.png" width="600">
 </p>
@@ -118,12 +120,15 @@ Edit `params/parameter.json` to configure your simulation:
 
 </div>
 
+> [TODO](#TODO) How to actually run?
+
 ### Output
 
 After running simulations:
 - **HDF5 files**: `results/<case_name>/sim_<time>.h5` — Full simulation state with temperature fields
 - **COP-values**: based on the tempeature field and the input parameter every single BHE and the overall COP is estimated.
 - **Plots**: Temperature field visualizations (if plotting is enabled)
+
 <p align="center">
   <img src="figures/example_result.png" width="600">
 </p>
@@ -138,6 +143,8 @@ utilization rate $\eta = 0.7$,
 and porosity $n_\mathrm{p} = 0.2$.
 
 ### Viewing Results
+
+> [TODO](#TODO) Add link to relevant VSCode extensions
 
 Use the built-in plotting utilities `src/plot.py` or use vscode extension H5Web or
 inspect HDF5 files with Python:
@@ -192,7 +199,7 @@ with h5py.File('results/your_simulation/sim_20years.h5', 'r') as f:
 
 ## Litature
 
-[^1] Alnaes, M. S., et al. (2015). The FEniCS Project Version 1.5. *Archive of Numerical Software, 3*.
+[^1]: Alnaes, M. S., et al. (2015). The FEniCS Project Version 1.5. *Archive of Numerical Software, 3*.
 
 2. Kobus, H. (1992). Schadstoffe im Grundwasser. Wärme- und Schadstofftransport im Grundwasser. In H. Kobus (Hrsg.), *Wärme- und Schadstofftransport im Grundwasser*. Weinheim: VCH.
    
