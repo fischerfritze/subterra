@@ -28,7 +28,7 @@ This project requires FEniCS, gmsh and more.
 A Python-based toolkit for two dimensional simulations of borehole thermal energy storage (BTES) with finite elments using FEniCS [1]. For the calculation with groundwater flow, the heat transport equation is be solved:
 
 $$
-\frac{\partial T}{\partial t}- a_{\mathrm{eff}} \, \Delta T+ b \, (\mathbf{v}\cdot \nabla T)= \frac{f}{(\rho c)_{\mathrm{g}}},
+\frac{\partial T}{\partial t}- a_{\mathrm{eff}}  \Delta T+ b  (\mathbf{v}\cdot \nabla T)= \frac{f}{(\rho c)_{\mathrm{g}}},
 $$
 
 $$
