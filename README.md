@@ -7,6 +7,8 @@ This project requires FEniCS, gmsh and more.
 
 ### Build Docker Image
 
+> [TODO](#TODO): Might start with 'git clone this repo'
+
 1. **Build the image:**
    ```bash
    docker build -t subterra:local .
@@ -20,6 +22,8 @@ This project requires FEniCS, gmsh and more.
 3. **Inside the container, run your simulations**
 
 ## Functionality
+
+> [TODO](#TODO): Should speify 'groundwater flow calculation' before using the term
 
 A Python-based toolkit for two dimensional simulations of borehole thermal energy storage (BTES) with finite elments using FEniCS [1]. For the calculation with groundwater flow, the heat transport equation is be solved:
 
