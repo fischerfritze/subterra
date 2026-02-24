@@ -145,7 +145,6 @@ Format:
 
 </div>
 
-> [TODO](#TODO) How to actually run?
 
 ### Run Simulations
 
