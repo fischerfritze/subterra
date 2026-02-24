@@ -14,17 +14,21 @@ from src.simulation.utils.h5py_writer import H5Writer
 from src.simulation.utils.paths import (PARAMETER_FILE, PARAMETER_FILE_SI,
                                         RESULTS_DIR, TEMP_DIR)
 from src.simulation.utils.tools import P_el_values, weighted_parameter
-from src.convert_to_si import convert_to_si
+from src.simulation.utils.convert_to_si import run_conversion
 
 
 def run_calculation():
 
     # SI-conversion of parameter file
     try:
-        convert_to_si(PARAMETER_FILE, PARAMETER_FILE_SI)
+        run_conversion(PARAMETER_FILE, PARAMETER_FILE_SI)
         print(f"SI-Konvertierung erfolgreich: {PARAMETER_FILE_SI}")
+        
     except Exception as e:
         print(f"Fehler bei der SI-Konvertierung: {e}")
+        traceback.print_exc()
+        exit(1)
+        
 
     # load JSON data
     with open(PARAMETER_FILE_SI, "r") as f:
@@ -40,7 +44,7 @@ def _run_calculation(params: Box, params_si: Box):
     TEMP_MESH_PATH = path.join(TEMP_DIR, "temp_mesh.xml")
     TEMP_MESH_FACET_REGION_PATH = path.join(
         TEMP_DIR, "temp_mesh_facet_region.xml")
-    folder_name = f"{n_EWS}EWS_κ = {params_si.ground.thermalConductivity.value}_{params_si.time.simulationYears.value}years"
+    folder_name = f"{params_si.meshMode[0]}_{params_si.meshMode[1]}_κ = {params_si.ground.thermalConductivity.value}_{params_si.time.simulationYears.value}years"
     base_folder = path.join(RESULTS_DIR, folder_name)
     makedirs(base_folder, exist_ok=True)
 
@@ -235,7 +239,6 @@ def _run_calculation(params: Box, params_si: Box):
             cpu = cpu_percent(interval=0.0)
             ram = virtual_memory().percent
             bar.text(f'(CPU: {cpu:.1f}%, RAM: {ram:.1f}%)')
-
             Q_dict = powerprofile.get(time_step)
             if not Q_dict:
                 raise ValueError(

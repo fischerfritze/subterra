@@ -3,7 +3,7 @@
   "useMode": "local",
   "meshMode": [
     "hexa",
-    1
+    2
   ],
   "enableConvection": true,
   "temperatureAbsolute": {
@@ -40,7 +40,7 @@
       "unit": "m"
     },
     "yCenter": {
-      "value": 0.0,
+      "value": 0,
       "unit": "m"
     }
   },
@@ -50,7 +50,7 @@
       "unit": "s"
     },
     "simulationYears": {
-      "value": 630720000.0,
+      "value": 31536000.0,
       "unit": "s"
     }
   },
@@ -94,8 +94,8 @@
       "unit": "m/s"
     },
     "velocityY": {
-      "value": 0.0,
-      "unit": "m/s"
+      "value": 0,
+      "unit": "cm/day"
     }
   },
   "air": {

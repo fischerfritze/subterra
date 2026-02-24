@@ -156,6 +156,25 @@ def convert_to_si(obj: Any) -> Any:
         return obj
 
 
+def run_conversion(in_path: str, out_path: str | None = None):
+    """
+    Führt die Konvertierung durch.
+    Gibt das Ergebnis zurück.
+    """
+    if not os.path.exists(in_path):
+        raise FileNotFoundError(f"File not found: {in_path}")
+
+    with open(in_path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+
+    result = convert_to_si(data)  
+
+    if out_path:
+        with open(out_path, "w", encoding="utf-8") as f:
+            json.dump(result, f, ensure_ascii=False, indent=2)
+
+    return result
+
 if __name__ == "__main__":
 
     # Parse command line arguments

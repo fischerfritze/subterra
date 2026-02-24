@@ -1,7 +1,7 @@
 {
   "version": "2",
   "useMode": "local",
-  "meshMode": ["hexa", 1],
+  "meshMode": ["hexa", 2],
   "enableConvection": true,
 
   "temperatureAbsolute": { "value": 273.15, "unit": "K" },
@@ -19,7 +19,7 @@
 
   "time": {
     "timeStepHours":  { "value": 24, "unit": "h" },
-    "simulationYears":{ "value": 20, "unit": "year" }
+    "simulationYears":{ "value": 1, "unit": "year" }
   },
 
   "ground": {
