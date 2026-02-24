@@ -124,12 +124,23 @@ Edit `params/parameter.json` to configure your simulation:
 
 > [TODO](#TODO) How to actually run?
 
+### Run Simulations
+
+```bash
+python3 -m src.main run
+```
+
+
 ### Output
 
 After running simulations:
 - **HDF5 files**: `results/<case_name>/sim_<time>.h5` — Full simulation state with temperature fields
 - **COP-values**: based on the tempeature field and the input parameter every single BHE and the overall COP is estimated.
-- **Plots**: Temperature field visualizations (if plotting is enabled)
+- **Plots**: Temperature field visualizations:
+
+```bash
+python3 -m src.main plot <h5_path>
+```
 
 <p align="center">
   <img src="figures/example_result.png" width="600">
