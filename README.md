@@ -96,13 +96,36 @@ subterra/
 
 ## Usage
 
-### Input Parameters
+## Input Parameters
 
-Edit `params/parameter.json` to configure your simulation:
-- Geometry parameters of the Mesh
-- Borehole heat exchanger (BHE) properties
-- Geometry of the borehole thermal energy storage (BTES)
-- Material properties of the subsoil and groundwater (thermal conductivity model 1,2,3 after [^3])
+Edit `params/parameter.json` to configure the simulation.
+
+### Mesh configuration (`"meshMode"`)
+
+Defines the BHE layout:
+
+- Single BHE  
+  `"meshMode": ["hexa", 0]`
+
+- Square grid with 2 rings  
+  `"meshMode": ["square", 2]`
+
+- Hexagonal grid with 3 rings  
+  `"meshMode": ["hexa", 3]`
+
+Format:
+`["type", rings]`  
+`type:` = grid type,  
+`rings` = number of surrounding BHE rings
+
+### BHE properties
+`"power"` – change BHE properties
+
+### BTES geometry
+`"mesh"` – change BTES geometry and mesh resolution
+
+### Subsurface properties
+`"ground"` and `"groundwater"` – with `"modelType"` defined after. [^3]
 
 
 <div align="center">
@@ -125,6 +148,8 @@ Edit `params/parameter.json` to configure your simulation:
 > [TODO](#TODO) How to actually run?
 
 ### Run Simulations
+
+First set your parameters in `params/parameter.json` and then run the main routine:
 
 ```bash
 python3 -m src.main run
@@ -157,9 +182,7 @@ and porosity $n_\mathrm{p} = 0.2$.
 
 ### Viewing Results
 
-> [TODO](#TODO) Add link to relevant VSCode extensions
-
-Use the built-in plotting utilities `src/plot.py` or use vscode extension H5Web or
+You can inspect HDF5 files with VSCode extension [H5Web](https://marketplace.visualstudio.com/items?itemName=h5web.vscode-h5web) or use the built-in plotting utilities in `src/plot.py`:
 inspect HDF5 files with Python:
 ```python
 import h5py

@@ -23,10 +23,10 @@
   },
 
   "ground": {
+    "modelType":           { "value": 1,    "unit": "1" },
     "heatCapacityDensity": { "value": 2.00, "unit": "MJ/m³/K" },
     "thermalConductivity": { "value": 2.0,  "unit": "W/m/K" },
     "porosity":            { "value": 0.2,  "unit": "1" },
-    "modelType":           { "value": 1,    "unit": "1" },
     "temperature":         { "value": 12,   "unit": "°C" }
   },
 
