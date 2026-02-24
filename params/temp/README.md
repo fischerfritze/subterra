@@ -1,0 +1,1 @@
+This path is needed to store the temporary files.

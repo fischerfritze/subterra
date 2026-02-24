@@ -50,11 +50,15 @@
       "unit": "s"
     },
     "simulationYears": {
-      "value": 31536000.0,
+      "value": 157680000.0,
       "unit": "s"
     }
   },
   "ground": {
+    "modelType": {
+      "value": 1.0,
+      "unit": "1"
+    },
     "heatCapacityDensity": {
       "value": 2000000.0,
       "unit": "J/m^3/K"
@@ -65,10 +69,6 @@
     },
     "porosity": {
       "value": 0.2,
-      "unit": "1"
-    },
-    "modelType": {
-      "value": 1.0,
       "unit": "1"
     },
     "temperature": {
