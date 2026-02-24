@@ -58,7 +58,6 @@ python-box==7.3.2
 python-dateutil==2.8.1
 pythran==0.10.0
 pytz==2022.1
-pyvista==0.44.2
 PyYAML==5.4.1
 requests==2.32.3
 rich==13.7.1
@@ -74,6 +73,5 @@ typing_extensions==4.12.0
 ufoLib2==0.13.1
 unicodedata2==14.0.0
 urllib3==2.3.0
-vtk==9.3.1
 wcwidth==0.2.13
 webencodings==0.5.1
