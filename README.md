@@ -7,24 +7,30 @@ This project requires FEniCS, gmsh and more.
 
 ### Build Docker Image
 
-1. **Build the image:**
+1. **Clone the repository:**
    ```bash
-   docker build -t subterra:local .
+   git clone https://github.com/USERNAME/subterra.git
+   cd subterra
+   ```
+   
+2. **Build the image:**
+   ```bash
+   docker build -t subterra:local -f .devcontainer/Dockerfile .
    ```
 
-2. **Run the container:**
+3. **Run the container:**
    ```bash
    docker run -it -v $(pwd):/home/SubTerra subterra:local /bin/bash
    ```
 
-3. **Inside the container, run your simulations**
+3. **Inside the container, run and modify your simulations**
 
 ## Functionality
 
-A Python-based toolkit for two dimensional simulations of borehole thermal energy storage (BTES) with finite elments using FEniCS [1]. For the calculation with groundwater flow, the heat transport equation is be solved:
+A Python-based toolkit for two dimensional simulations of borehole thermal energy storage (BTES) with finite elments using FEniCS [^1]. For the calculation the heat transport equation is be solved:
 
 $$
-\frac{\partial T}{\partial t}- a_{\mathrm{eff}} \, \Delta T+ b \, (\mathbf{v}\cdot \nabla T)= \frac{f}{(\rho c)_{\mathrm{g}}},
+\frac{\partial T}{\partial t}- a_{\mathrm{eff}}  \Delta T+ b  (\mathbf{v}\cdot \nabla T)= \frac{f}{(\rho c)_{\mathrm{g}}},
 $$
 
 $$
@@ -33,17 +39,19 @@ $$
 
 **Key assumtions:**
 
-- Both media (water, ground) are assumed to have *similar temperatures*:   $T_\mathrm{w} = T_\mathrm{g}$ [2].
-- Vertical groundwater flow and pressure effects are neglected; water density $\rho_w$ is *temperature-independent* [2] 
-- The soil is assumed *homogeneous* and *isotropic* with respect to $\kappa_g$ and $(\rho c)_g$.
+- Both media (water, ground) are assumed to have *similar temperatures*:   $T_\mathrm{w} = T_\mathrm{g}$ [^2].
+- Vertical groundwater flow and pressure effects are neglected; water density $\rho_w$ is *temperature-independent* [^2] 
+- The soil is *homogeneous* and *isotropic* with respect to $\kappa_g$ and $(\rho c)_g$.
 - The terrestrial heat flux ($\approx 65 \text{mWm}^{-2}$) is negligible relative to the BHE heat rate.
-- The individual BHEs are modeled using the FEniCS `PointSource()` function with time-dependent heat flux: $f(t, \mathbf{r}) = q(t)\sum_j \delta(\mathbf{r}-\mathbf{r}_j)$.
 - Assuming vertical symmetry, the numerical analysis can be reduced to *two dimensions*.
-- *Dirichlet boundary conditions* are assumed, where at great distance the ground temperature $T_0$ is kept constant.
-- The *heat utilization rate* $\eta$ is the ratio of extracted heat over stored heat determined by <br>
-   $q(t)  = A - B \cos \left( \frac{2 \pi}  {t_\mathrm{year}} \cdot t \right) \Rightarrow \eta = \frac{Q_\mathrm{out}}{Q_\mathrm{in}}$
+- *Dirichlet boundary conditions*, where at great distance the ground temperature $T_0$ is kept constant.
+- The individual BHEs are modeled using the FEniCS `PointSource()` function with time-dependent heat flux: $f(t, \mathbf{r}) = q(t)\sum_j \delta(\mathbf{r}-\mathbf{r}_j)$.
+- The *heat utilization rate* $\eta$ is the ratio of extracted heat over stored heat determined by:
+
+  $q(t)  = A - B \cos \left( \frac{2 \pi}  {t_\mathrm{year}} \cdot t \right) \Rightarrow \eta = \frac{Q_\mathrm{out}}{Q_\mathrm{in}}$
+
 <p align="center">
-  <img src="figures/powerprofile.png" width="600">
+  <img src="figures/powerprofile.png" width="800">
 </p>
 
 **Numerical checks:**
@@ -88,13 +96,36 @@ subterra/
 
 ## Usage
 
-### Input Parameters
+## Input Parameters
 
-Edit `params/parameter.json` to configure your simulation:
-- Geometry parameters of the Mesh
-- Borehole heat exchanger (BHE) properties
-- Geometry of the borehole thermal energy storage (BTES)
-- Material properties of the subsoil and groundwater (thermal conductivity model 1,2,3 after [3])
+Edit `params/parameter.json` to configure the simulation.
+
+### Mesh configuration (`"meshMode"`)
+
+Defines the BHE layout:
+
+- Single BHE  
+  `"meshMode": ["hexa", 0]`
+
+- Square grid with 2 rings  
+  `"meshMode": ["square", 2]`
+
+- Hexagonal grid with 3 rings  
+  `"meshMode": ["hexa", 3]`
+
+Format:
+`["type", rings]`  
+`type:` = grid type,  
+`rings` = number of surrounding BHE rings
+
+### BHE properties
+`"power"` – change BHE properties
+
+### BTES geometry
+`"mesh"` – change BTES geometry and mesh resolution
+
+### Subsurface properties
+`"ground"` and `"groundwater"` – with `"modelType"` defined after. [^3]
 
 
 <div align="center">
@@ -114,12 +145,27 @@ Edit `params/parameter.json` to configure your simulation:
 
 </div>
 
+
+### Run Simulations
+
+First set your parameters in `params/parameter.json` and then run the main routine:
+
+```bash
+python3 -m src.main run
+```
+
+
 ### Output
 
 After running simulations:
 - **HDF5 files**: `results/<case_name>/sim_<time>.h5` — Full simulation state with temperature fields
 - **COP-values**: based on the tempeature field and the input parameter every single BHE and the overall COP is estimated.
-- **Plots**: Temperature field visualizations (if plotting is enabled)
+- **Plots**: Temperature field visualizations:
+
+```bash
+python3 -m src.main plot <h5_path>
+```
+
 <p align="center">
   <img src="figures/example_result.png" width="600">
 </p>
@@ -135,7 +181,7 @@ and porosity $n_\mathrm{p} = 0.2$.
 
 ### Viewing Results
 
-Use the built-in plotting utilities `src/plot.py` or use vscode extension H5Web or
+You can inspect HDF5 files with VSCode extension [H5Web](https://marketplace.visualstudio.com/items?itemName=h5web.vscode-h5web) or use the built-in plotting utilities in `src/plot.py`:
 inspect HDF5 files with Python:
 ```python
 import h5py
@@ -186,13 +232,11 @@ with h5py.File('results/your_simulation/sim_20years.h5', 'r') as f:
 
 ---
 
-## Litature
+[^1]: Alnaes, M. S., et al. (2015). The FEniCS Project Version 1.5. *Archive of Numerical Software, 3*.
 
-1. Alnaes, M. S., et al. (2015). The FEniCS Project Version 1.5. *Archive of Numerical Software, 3*.
-
-2. Kobus, H. (1992). Schadstoffe im Grundwasser. Wärme- und Schadstofftransport im Grundwasser. In H. Kobus (Hrsg.), *Wärme- und Schadstofftransport im Grundwasser*. Weinheim: VCH.
+[^2]: Kobus, H. (1992). Schadstoffe im Grundwasser. Wärme- und Schadstofftransport im Grundwasser. In H. Kobus (Hrsg.), *Wärme- und Schadstofftransport im Grundwasser*. Weinheim: VCH.
    
-3. Arbeitskreis Geothermie, et al. (2015). *Empfehlungen Oberflächennahe Geothermie – Planung, Bau, Betrieb und Überwachung (EA Geothermie)*. Berlin: Ernst und Sohn.
+[^3]: Arbeitskreis Geothermie, et al. (2015). *Empfehlungen Oberflächennahe Geothermie – Planung, Bau, Betrieb und Überwachung (EA Geothermie)*. Berlin: Ernst und Sohn.
 
 ## License
 

@@ -1,6 +1,9 @@
 {
-  "name": "SubTerra (refactored)",
-  "image": "fischerfritze/subterra:v2",
+  "name": "SubTerra",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
   "remoteUser": "root",
   "containerEnv": {
     "PETSC_DIR": "/usr/local/petsc",
@@ -12,7 +15,11 @@
   },
   "customizations": {
     "vscode": {
-      "extensions": ["ms-python.python", "ms-toolsai.jupyter", "ms-azuretools.vscode-docker"]
+      "extensions": [
+        "ms-python.python",
+        "ms-toolsai.jupyter",
+        "ms-azuretools.vscode-docker"
+      ]
     }
   }
 }

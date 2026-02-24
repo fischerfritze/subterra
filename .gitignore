@@ -5,6 +5,7 @@ __pycache__/
 *.pyc
 *.pyo
 *.egg-info/
+*.xml
 
 # Build/Artefakte
 build/
@@ -14,8 +15,6 @@ dist/
 *.log
 **/.ipynb_checkpoints/
 
-
-
 # Secrets/Env
 .env
 .env.*
@@ -23,4 +22,4 @@ dist/
 # Subterra
 results/
 meshes/
-params/temp/
+
