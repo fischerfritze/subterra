@@ -11,7 +11,7 @@ This project requires FEniCS, gmsh and more.
 
 1. **Build the image:**
    ```bash
-   docker build -t subterra:local .
+   docker build -t subterra:local -f .devcontainer/Dockerfile .
    ```
 
 2. **Run the container:**
