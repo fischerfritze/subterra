@@ -5,28 +5,57 @@ import os
 import json
 
 from box import Box
-from fenics import Point
 from src.simulation.utils.paths import PARAMETER_FILE_SI, TEMP_DIR
+
+LOCATIONS_FILE = os.path.join(TEMP_DIR, "locations.json")
 
 
 def generate_mesh(mode, x_0, y_0, distance):
+    """Generate mesh and save locations to JSON.
+    
+    Returns:
+        list of [x, y] coordinate pairs (serializable).
+    """
     print("--------------------------------------------------------------------")
     if mode[0] == 'hexa':
         locations, EWS_dict = generate_hexa_ews(
             x_b0=x_0, y_b0=y_0, d=distance, rings=mode[1])
         meshing(EWS_dict)
-
+        save_locations(locations)
         return locations
 
     elif mode[0] == 'square':
         locations, EWS_dict = generate_square_ews(
             x_b0=x_0, y_b0=y_0, d=distance, rings=mode[1])
         meshing(EWS_dict)
-
+        save_locations(locations)
         return locations
 
     else:
         raise ValueError(f"Unknown mode: {mode}")
+
+
+def save_locations(locations):
+    """Save borehole locations to JSON file in temp directory."""
+    os.makedirs(TEMP_DIR, exist_ok=True)
+    with open(LOCATIONS_FILE, "w") as f:
+        json.dump(locations, f, indent=2)
+    print(f"Locations saved to {LOCATIONS_FILE}")
+
+
+def load_locations():
+    """Load borehole locations from JSON file.
+    
+    Returns:
+        list of [x, y] coordinate pairs.
+    """
+    if not os.path.exists(LOCATIONS_FILE):
+        raise FileNotFoundError(
+            f"Locations file not found: {LOCATIONS_FILE}. "
+            "Run mesh generation first."
+        )
+    with open(LOCATIONS_FILE, "r") as f:
+        return json.load(f)
 
 
 def generate_hexa_ews(x_b0, y_b0, d, rings):
@@ -52,7 +81,7 @@ def generate_hexa_ews(x_b0, y_b0, d, rings):
         distance = math.sqrt((x - x_b0) ** 2 + (y - y_b0) ** 2)
         if distance <= rings * d:
             hexa_EWS[f"BH{index:02d}"] = (x, y)
-            locations.append(Point(x, y))
+            locations.append([x, y])
             index += 1
 
     return locations, hexa_EWS
@@ -72,7 +101,7 @@ def generate_square_ews(x_b0, y_b0, d, rings):
             distance = max(abs(i), abs(j))
             if distance <= rings:
                 square_EWS[f"BH{index:02d}"] = (x, y)
-                locations.append(Point(x, y))
+                locations.append([x, y])
                 index += 1
 
     return locations, square_EWS
