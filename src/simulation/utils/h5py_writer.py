@@ -45,10 +45,10 @@ class H5Writer:
 
     def add_vertex_snapshot_full(self, name, mesh, T, compression="lzf"):
             """
-            Speichert das Feld in Vertex-Darstellung:
+            Speichert das Feld in Vertex-Darstellung (DOLFINx):
             - coords: (num_vertices, gdim)
             - cells:  (num_cells, vertices_per_cell)
-            - values: (num_vertices,)  (bei Skalarfeld)
+            - values: (num_dofs,)  (bei CG1 == num_vertices)
             Eignet sich perfekt für CG1 (lineare Lagrange).
             """
             g = self.snapshots.create_group(name)
@@ -56,52 +56,69 @@ class H5Writer:
             g.attrs["time_label"] = name  # z.B. "T_vertex_20.0a"
 
             # Geometrie
-            coords = mesh.coordinates()                 # (Nverts, gdim)
-            cells  = mesh.cells()                       # (Ncells, nvert_per_cell)
+            coords = mesh.geometry.x                     # (Nverts, 3)
+            gdim = mesh.geometry.dim
+            coords_2d = coords[:, :gdim]                 # (Nverts, gdim)
 
-            g.create_dataset("coords", data=coords, compression=compression, chunks=True)
+            # Cells from topology connectivity
+            mesh.topology.create_connectivity(mesh.topology.dim, 0)
+            conn = mesh.topology.connectivity(mesh.topology.dim, 0)
+            num_cells = mesh.topology.index_map(mesh.topology.dim).size_local
+            cells = np.array(
+                [conn.links(i) for i in range(num_cells)], dtype=np.int32
+            )
+
+            g.create_dataset("coords", data=coords_2d, compression=compression, chunks=True)
             g.create_dataset("cells",  data=cells,  compression=compression, chunks=True)
 
-            # Feldwerte an Vertices
-            vals = T.compute_vertex_values(mesh)        # shape (Nverts,)
+            # Feldwerte (CG1: DOF array == vertex values)
+            vals = T.x.array                              # shape (Ndofs,)
             g.create_dataset("values", data=vals.astype("f4"), compression=compression, chunks=True)
 
-            # ein paar Metadaten
-            g.attrs["gdim"] = coords.shape[1]
-            g.attrs["num_vertices"] = coords.shape[0]
+            # Metadaten
+            g.attrs["gdim"] = gdim
+            g.attrs["num_vertices"] = coords_2d.shape[0]
             g.attrs["num_cells"] = cells.shape[0]
 
     def add_dof_snapshot(self, name, V_space, T, compression="lzf", save_mesh=None):
             """
-            Speichert das Feld in DOF-Darstellung (für beliebigen Polynomialgrad):
+            Speichert das Feld in DOF-Darstellung (DOLFINx, beliebiger Polynomialgrad):
             - dof_coords: (ndofs, gdim)
             - dof_values: (ndofs,)
-            Optional: Mesh (coords+cells), falls du absolut alles in einem Knoten haben willst.
+            Optional: Mesh (coords+cells), falls gewünscht.
             """
             g = self.snapshots.create_group(name)
             g.attrs["kind"] = "dof"
             g.attrs["time_label"] = name
 
-            # DOF-Koordinaten und Werte
-            dof_coords = V_space.tabulate_dof_coordinates().reshape((-1, V_space.mesh().geometry().dim()))
-            dof_vals   = T.vector().get_local()
+            # DOF-Koordinaten und Werte (DOLFINx)
+            dof_coords_3d = V_space.tabulate_dof_coordinates()  # (ndofs, 3)
+            gdim = V_space.mesh.geometry.dim
+            dof_coords = dof_coords_3d[:, :gdim]
+            dof_vals = T.x.array
 
             g.create_dataset("dof_coords", data=dof_coords, compression=compression, chunks=True)
             g.create_dataset("dof_values", data=dof_vals.astype("f4"), compression=compression, chunks=True)
 
             # Element/Space-Metadaten
-            g.attrs["family"] = V_space.ufl_element().family()
-            g.attrs["degree"] = V_space.ufl_element().degree()
-            g.attrs["gdim"]   = dof_coords.shape[1]
+            ufl_elem = V_space.ufl_element()
+            g.attrs["family"] = str(ufl_elem.family())
+            g.attrs["degree"] = int(ufl_elem.degree())
+            g.attrs["gdim"]   = int(gdim)
             g.attrs["ndofs"]  = dof_coords.shape[0]
 
             if save_mesh is not None:
                 mg = g.create_group("mesh")
-                coords = save_mesh.coordinates()
-                cells  = save_mesh.cells()
+                coords = save_mesh.geometry.x[:, :gdim]
+                save_mesh.topology.create_connectivity(save_mesh.topology.dim, 0)
+                conn = save_mesh.topology.connectivity(save_mesh.topology.dim, 0)
+                num_cells = save_mesh.topology.index_map(save_mesh.topology.dim).size_local
+                cells = np.array(
+                    [conn.links(i) for i in range(num_cells)], dtype=np.int32
+                )
                 mg.create_dataset("coords", data=coords, compression=compression, chunks=True)
                 mg.create_dataset("cells",  data=cells,  compression=compression, chunks=True)
-                mg.attrs["gdim"] = coords.shape[1]
+                mg.attrs["gdim"] = int(gdim)
 
     def append_step(self, *, day, error, E_probe, E_flux, Delta_E, E_inout,
                     Q_probe=np.nan, E_storage=np.nan,
