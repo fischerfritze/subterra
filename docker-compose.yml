@@ -1,0 +1,71 @@
+# SubTerra Docker Compose
+# Runs Laravel backend (API + queue workers) + Redis + FEniCS image build
+#
+# Usage:
+#   docker compose up -d          # Start backend + redis
+#   docker compose build fenics   # Build FEniCS image (used by queue jobs)
+#
+# The FEniCS container is NOT run as a service — it is invoked per-job
+# by the Laravel queue workers via `docker run`.
+
+services:
+
+  # ─── Redis (Queue + Cache) ───────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+
+  # ─── Laravel Backend (API + Queue Workers) ───────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: docker/backend/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      APP_NAME: SubTerra
+      APP_ENV: local
+      APP_DEBUG: "true"
+      APP_URL: http://localhost:8000
+      DB_CONNECTION: sqlite
+      DB_DATABASE: /var/www/html/database/database.sqlite
+      QUEUE_CONNECTION: redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      CACHE_DRIVER: redis
+      SESSION_DRIVER: redis
+      SUBTERRA_FENICS_IMAGE: subterra-fenics
+    volumes:
+      # Mount Docker socket so backend can spawn FEniCS containers
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Shared volume for job work directories
+      - jobs_data:/var/www/html/storage/app/jobs
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ─── FEniCS Image (build only, not run as service) ──────────────────
+  fenics:
+    build:
+      context: .
+      dockerfile: docker/fenics/Dockerfile
+    image: subterra-fenics
+    # This service is only for building the image.
+    # It exits immediately. Queue workers use `docker run subterra-fenics`.
+    command: ["echo", "FEniCS image built successfully"]
+    profiles:
+      - build
+
+volumes:
+  redis_data:
+  jobs_data:
