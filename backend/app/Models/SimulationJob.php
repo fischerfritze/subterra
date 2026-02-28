@@ -85,8 +85,10 @@ class SimulationJob extends Model
      */
     public function hasMesh(): bool
     {
-        return file_exists($this->tempDir() . '/temp_mesh.xml')
-            && file_exists($this->tempDir() . '/locations.json');
+        $temp = $this->tempDir();
+        $hasMeshFile = file_exists($temp . '/temp_mesh.msh')
+            || file_exists($temp . '/temp_mesh.xml');
+        return $hasMeshFile && file_exists($temp . '/locations.json');
     }
 
     /**
