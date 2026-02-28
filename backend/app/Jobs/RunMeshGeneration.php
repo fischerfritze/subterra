@@ -38,11 +38,8 @@ class RunMeshGeneration implements ShouldQueue
 
             Log::info("Mesh generation started for job {$job->id}");
 
-            // Execute mesh runner inside the FEniCS container via docker exec
-            // The work_dir is mounted into the container at /subterra/work
-            $result = Process::timeout($this->timeout)->run(
-                $this->buildDockerCommand($job)
-            );
+            // Execute mesh runner
+            $result = $this->runProcess($job);
 
             if ($result->successful()) {
                 $job->update([
@@ -65,20 +62,49 @@ class RunMeshGeneration implements ShouldQueue
         }
     }
 
+    private function runProcess(SimulationJob $job): \Illuminate\Process\ProcessResult
+    {
+        $mode = config('subterra.runner_mode', 'docker');
+
+        if ($mode === 'local') {
+            return $this->runLocal($job);
+        }
+
+        return Process::timeout($this->timeout)->run(
+            $this->buildDockerCommand($job)
+        );
+    }
+
+    private function runLocal(SimulationJob $job): \Illuminate\Process\ProcessResult
+    {
+        $projectRoot = config('subterra.project_root');
+        $paramFile   = $job->parameterFilePath();
+
+        // Use env PATH=... prefix so the full parent environment is preserved
+        // (FEniCS/DOLFIN needs MPI, LD_LIBRARY_PATH, etc.)
+        return Process::timeout($this->timeout)
+            ->path($projectRoot)
+            ->run(implode(' ', [
+                'env', 'PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
+                'python3', '-m', 'src.mesh_runner',
+                '--params', escapeshellarg($paramFile),
+            ]));
+    }
+
     private function buildDockerCommand(SimulationJob $job): string
     {
-        $workDir = $job->work_dir;
-        $image = config('subterra.fenics_container', 'subterra-fenics');
+        $image  = config('subterra.fenics_container', 'subterra-fenics');
+        $volume = config('subterra.docker_jobs_volume', 'subterra_jobs_data');
+        $jobId  = $job->id;
 
-        // Mount the job's work directory into the FEniCS container
-        // Inside the container, entrypoint.sh symlinks /subterra/params -> /subterra/work
         return implode(' ', [
             'docker', 'run', '--rm',
-            '--name', "subterra-mesh-{$job->id}",
-            '-v', "{$workDir}:/subterra/work",
+            '--name', "subterra-mesh-{$jobId}",
+            '-v', "{$volume}:/subterra/jobs",
+            '-e', "JOB_ID={$jobId}",
             $image,
             'python3', '-m', 'src.mesh_runner',
-            '--params', '/subterra/work/parameter.json',
+            '--params', "/subterra/jobs/{$jobId}/parameter.json",
         ]);
     }
 }

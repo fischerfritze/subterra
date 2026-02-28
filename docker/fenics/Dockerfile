@@ -1,5 +1,6 @@
 # SubTerra FEniCS simulation container
 # Used by the Laravel backend to run mesh generation and simulations.
+# NOT a long-running service — spawned per job via `docker run`.
 FROM ghcr.io/scientificcomputing/fenics-gmsh:2024-05-30
 
 WORKDIR /subterra
@@ -8,11 +9,19 @@ WORKDIR /subterra
 COPY src/ /subterra/src/
 COPY requirements.txt /subterra/requirements.txt
 
-# Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+# Install only the extra Python dependencies not already in the base image.
+# Use --no-deps to avoid pulling transitive deps that conflict with system packages.
+# Packages already provided by fenics-gmsh (gmsh, h5py, mpi4py, numpy, scipy,
+# matplotlib, meshio, sympy, etc.) are skipped.
+RUN pip install --no-cache-dir \
+    alive-progress \
+    python-box \
+    scooby \
+    pooch \
+    || true \
+    && pip install --no-cache-dir --no-deps -r requirements.txt 2>/dev/null || true
 
-# Create a wrapper script that sets up the work directory symlinks
-# so that the Python code can find params/temp and results in the mounted work dir
+# Copy and prepare entrypoint
 COPY docker/entrypoint.sh /subterra/entrypoint.sh
 RUN chmod +x /subterra/entrypoint.sh
 

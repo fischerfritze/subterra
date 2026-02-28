@@ -11,10 +11,30 @@ from psutil import cpu_percent, virtual_memory
 from src.simulation import mesh as msh
 from src.simulation import powerprofile as pp
 from src.simulation.utils.h5py_writer import H5Writer
-from src.simulation.utils.paths import (PARAMETER_FILE, PARAMETER_FILE_SI,
-                                        RESULTS_DIR, TEMP_DIR)
+import src.simulation.utils.paths as _paths
 from src.simulation.utils.tools import P_el_values, weighted_parameter
 from src.simulation.utils.convert_to_si import run_conversion
+import os as _os
+
+
+def _write_progress(phase, current, total, message=""):
+    """Write progress.json into the params directory (= work dir)."""
+    progress_file = _os.path.join(_paths.PARAMS_DIR, 'progress.json')
+    pct = round(current / total * 100, 1) if total > 0 else 0
+    data = {
+        'phase': phase,
+        'current_step': current,
+        'total_steps': total,
+        'percent': pct,
+        'message': message,
+    }
+    try:
+        tmp = progress_file + '.tmp'
+        with open(tmp, 'w') as f:
+            json.dump(data, f)
+        _os.replace(tmp, progress_file)
+    except OSError:
+        pass
 
 
 def run_calculation():
@@ -22,8 +42,8 @@ def run_calculation():
 
     # SI-conversion of parameter file
     try:
-        run_conversion(PARAMETER_FILE, PARAMETER_FILE_SI)
-        print(f"SI-Konvertierung erfolgreich: {PARAMETER_FILE_SI}")
+        run_conversion(_paths.PARAMETER_FILE, _paths.PARAMETER_FILE_SI)
+        print(f"SI-Konvertierung erfolgreich: {_paths.PARAMETER_FILE_SI}")
         
     except Exception as e:
         print(f"Fehler bei der SI-Konvertierung: {e}")
@@ -32,9 +52,9 @@ def run_calculation():
         
 
     # load JSON data
-    with open(PARAMETER_FILE_SI, "r") as f:
+    with open(_paths.PARAMETER_FILE_SI, "r") as f:
         params_si = Box(json.load(f))
-    with open(PARAMETER_FILE, "r") as f:
+    with open(_paths.PARAMETER_FILE, "r") as f:
         params = Box(json.load(f))
 
     # Generate mesh (legacy: all-in-one)
@@ -55,13 +75,13 @@ def run_simulation(params: Box = None, params_si: Box = None):
     If params/params_si are not provided, loads them from the default paths.
     """
     if params is None:
-        with open(PARAMETER_FILE, "r") as f:
+        with open(_paths.PARAMETER_FILE, "r") as f:
             params = Box(json.load(f))
     if params_si is None:
         # Ensure SI file exists
-        if not path.exists(PARAMETER_FILE_SI):
-            run_conversion(PARAMETER_FILE, PARAMETER_FILE_SI)
-        with open(PARAMETER_FILE_SI, "r") as f:
+        if not path.exists(_paths.PARAMETER_FILE_SI):
+            run_conversion(_paths.PARAMETER_FILE, _paths.PARAMETER_FILE_SI)
+        with open(_paths.PARAMETER_FILE_SI, "r") as f:
             params_si = Box(json.load(f))
 
     return _run_simulation(params, params_si)
@@ -69,14 +89,15 @@ def run_simulation(params: Box = None, params_si: Box = None):
 
 def _run_simulation(params: Box, params_si: Box):
 
-    TEMP_MESH_PATH = path.join(TEMP_DIR, "temp_mesh.xml")
+    TEMP_MESH_PATH = path.join(_paths.TEMP_DIR, "temp_mesh.xml")
     TEMP_MESH_FACET_REGION_PATH = path.join(
-        TEMP_DIR, "temp_mesh_facet_region.xml")
+        _paths.TEMP_DIR, "temp_mesh_facet_region.xml")
     folder_name = f"{params_si.meshMode[0]}_{params_si.meshMode[1]}_κ = {params_si.ground.thermalConductivity.value}_{params_si.time.simulationYears.value}years"
-    base_folder = path.join(RESULTS_DIR, folder_name)
+    base_folder = path.join(_paths.RESULTS_DIR, folder_name)
     makedirs(base_folder, exist_ok=True)
 
-    print(f"Starting simulation with parameters from {PARAMETER_FILE_SI}")
+    print(f"Starting simulation with parameters from {_paths.PARAMETER_FILE_SI}")
+    _write_progress('simulation', 0, 1, 'Simulation wird vorbereitet...')
 
     # Load borehole locations from previously generated mesh
     locations_raw = msh.load_locations()
@@ -264,12 +285,23 @@ def _run_simulation(params: Box, params_si: Box):
         time_step = 1
         total_flux = 0.0
         E_probe_sum = 0.0
+        last_progress_pct = -5  # Track last written percentage
 
         while time_step <= time_steps:
             # show CPU and RAM
             cpu = cpu_percent(interval=0.0)
             ram = virtual_memory().percent
             bar.text(f'(CPU: {cpu:.1f}%, RAM: {ram:.1f}%)')
+
+            # Write progress every 5% (avoid I/O overhead)
+            current_pct = int(time_step / time_steps * 100)
+            if time_step == 1 or current_pct >= last_progress_pct + 5 or time_step == time_steps:
+                _write_progress(
+                    'simulation', time_step, time_steps,
+                    f'Schritt {time_step}/{time_steps} — CPU: {cpu:.0f}%, RAM: {ram:.0f}%'
+                )
+                last_progress_pct = current_pct
+
             Q_dict = powerprofile.get(time_step)
             if not Q_dict:
                 raise ValueError(
@@ -365,6 +397,8 @@ def _run_simulation(params: Box, params_si: Box):
             bar()
 
     writer.close()
+
+    _write_progress('simulation', time_steps, time_steps, 'Simulation abgeschlossen.')
 
     # import matplotlib.pyplot as plt
 

@@ -53,9 +53,28 @@ class SimulationController extends Controller
     {
         $jobs = SimulationJob::orderByDesc('created_at')
             ->limit($request->integer('limit', 20))
-            ->get(['id', 'status', 'created_at', 'mesh_completed_at', 'sim_completed_at']);
+            ->get();
 
-        return response()->json($jobs);
+        $result = $jobs->map(function (SimulationJob $job) {
+            $data = [
+                'id'                => $job->id,
+                'status'            => $job->status,
+                'created_at'        => $job->created_at,
+                'mesh_started_at'   => $job->mesh_started_at,
+                'mesh_completed_at' => $job->mesh_completed_at,
+                'sim_started_at'    => $job->sim_started_at,
+                'sim_completed_at'  => $job->sim_completed_at,
+            ];
+
+            // Include progress for running jobs
+            if (in_array($job->status, ['meshing', 'simulating'])) {
+                $data['progress'] = $job->progress();
+            }
+
+            return $data;
+        });
+
+        return response()->json($result);
     }
 
     /**
@@ -70,6 +89,7 @@ class SimulationController extends Controller
             'parameters'         => $job->parameters,
             'has_mesh'           => $job->hasMesh(),
             'result_files'       => $job->resultFiles(),
+            'progress'           => $job->progress(),
             'error_message'      => $job->error_message,
             'mesh_started_at'    => $job->mesh_started_at,
             'mesh_completed_at'  => $job->mesh_completed_at,

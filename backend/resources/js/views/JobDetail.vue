@@ -21,6 +21,15 @@
             {{ job.status }}
           </span>
         </div>
+
+        <!-- Progress bar -->
+        <div v-if="showProgress" style="margin-bottom: 1rem;">
+          <ProgressBar :progress="job.progress" :status="job.status" />
+          <div v-if="job.progress && job.progress.message" class="progress-message">
+            {{ job.progress.message }}
+          </div>
+        </div>
+
         <div v-if="job.error_message" class="alert alert-error" style="margin-top: .5rem;">
           {{ job.error_message }}
         </div>
@@ -78,9 +87,12 @@
 
 <script>
 import api from '@/services/api.js';
+import ProgressBar from '@/components/ProgressBar.vue';
 
 export default {
   name: 'JobDetail',
+
+  components: { ProgressBar },
 
   data() {
     return {
@@ -106,6 +118,9 @@ export default {
     },
     showActions() {
       return this.canRunAll || this.canMesh || this.canSimulate;
+    },
+    showProgress() {
+      return ['meshing', 'meshed', 'simulating', 'completed'].includes(this.job?.status);
     },
     isRunning() {
       return ['meshing', 'simulating'].includes(this.job?.status);
@@ -230,6 +245,11 @@ export default {
   font-weight: 600;
   color: var(--text-secondary);
   white-space: nowrap;
+}
+.progress-message {
+  margin-top: 0.4rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
 }
 .param-json {
   background: var(--bg-secondary);

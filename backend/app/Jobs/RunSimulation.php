@@ -45,9 +45,7 @@ class RunSimulation implements ShouldQueue
 
             Log::info("Simulation started for job {$job->id}");
 
-            $result = Process::timeout($this->timeout)->run(
-                $this->buildDockerCommand($job)
-            );
+            $result = $this->runProcess($job);
 
             if ($result->successful()) {
                 $job->update([
@@ -70,18 +68,49 @@ class RunSimulation implements ShouldQueue
         }
     }
 
+    private function runProcess(SimulationJob $job): \Illuminate\Process\ProcessResult
+    {
+        $mode = config('subterra.runner_mode', 'docker');
+
+        if ($mode === 'local') {
+            return $this->runLocal($job);
+        }
+
+        return Process::timeout($this->timeout)->run(
+            $this->buildDockerCommand($job)
+        );
+    }
+
+    private function runLocal(SimulationJob $job): \Illuminate\Process\ProcessResult
+    {
+        $projectRoot = config('subterra.project_root');
+        $paramFile   = $job->parameterFilePath();
+
+        // Use env PATH=... prefix so the full parent environment is preserved
+        // (FEniCS/DOLFIN needs MPI, LD_LIBRARY_PATH, etc.)
+        return Process::timeout($this->timeout)
+            ->path($projectRoot)
+            ->run(implode(' ', [
+                'env', 'PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
+                'python3', '-m', 'src.sim_runner',
+                '--params', escapeshellarg($paramFile),
+            ]));
+    }
+
     private function buildDockerCommand(SimulationJob $job): string
     {
-        $workDir = $job->work_dir;
-        $image = config('subterra.fenics_container', 'subterra-fenics');
+        $image  = config('subterra.fenics_container', 'subterra-fenics');
+        $volume = config('subterra.docker_jobs_volume', 'subterra_jobs_data');
+        $jobId  = $job->id;
 
         return implode(' ', [
             'docker', 'run', '--rm',
-            '--name', "subterra-sim-{$job->id}",
-            '-v', "{$workDir}:/subterra/work",
+            '--name', "subterra-sim-{$jobId}",
+            '-v', "{$volume}:/subterra/jobs",
+            '-e', "JOB_ID={$jobId}",
             $image,
             'python3', '-m', 'src.sim_runner',
-            '--params', '/subterra/work/parameter.json',
+            '--params', "/subterra/jobs/{$jobId}/parameter.json",
         ]);
     }
 }

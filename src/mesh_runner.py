@@ -21,6 +21,26 @@ from src.simulation.utils.convert_to_si import run_conversion
 from src.simulation.utils.paths import PARAMETER_FILE, PARAMETER_FILE_SI
 
 
+def _write_progress(param_file, phase, current, total, message=""):
+    """Write a progress.json next to the parameter file."""
+    progress_file = os.path.join(os.path.dirname(os.path.abspath(param_file)), 'progress.json')
+    pct = round(current / total * 100, 1) if total > 0 else 0
+    data = {
+        'phase': phase,
+        'current_step': current,
+        'total_steps': total,
+        'percent': pct,
+        'message': message,
+    }
+    try:
+        tmp = progress_file + '.tmp'
+        with open(tmp, 'w') as f:
+            json.dump(data, f)
+        os.replace(tmp, progress_file)
+    except OSError:
+        pass
+
+
 def run_mesh_generation(parameter_file: str = PARAMETER_FILE,
                         parameter_file_si: str = None):
     """Run SI conversion and mesh generation.
@@ -49,6 +69,8 @@ def run_mesh_generation(parameter_file: str = PARAMETER_FILE,
     paths_mod.TEMP_DIR = temp_dir
     msh.LOCATIONS_FILE = os.path.join(temp_dir, 'locations.json')
 
+    _write_progress(parameter_file, 'mesh', 0, 3, 'SI-Konvertierung...')
+
     # Step 1: SI-conversion
     try:
         run_conversion(parameter_file, parameter_file_si)
@@ -57,6 +79,8 @@ def run_mesh_generation(parameter_file: str = PARAMETER_FILE,
         print(f"Fehler bei der SI-Konvertierung: {e}")
         traceback.print_exc()
         raise
+
+    _write_progress(parameter_file, 'mesh', 1, 3, 'Parameter geladen, generiere Mesh...')
 
     # Step 2: Load SI parameters
     with open(parameter_file_si, "r") as f:
@@ -70,6 +94,7 @@ def run_mesh_generation(parameter_file: str = PARAMETER_FILE,
         distance=params_si.mesh.boreholeDistance.value
     )
 
+    _write_progress(parameter_file, 'mesh', 3, 3, 'Mesh fertig.')
     print(f"Mesh generation complete. {len(locations)} boreholes generated.")
     return locations
 

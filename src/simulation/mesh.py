@@ -5,9 +5,20 @@ import os
 import json
 
 from box import Box
-from src.simulation.utils.paths import PARAMETER_FILE_SI, TEMP_DIR
+import src.simulation.utils.paths as _paths
 
-LOCATIONS_FILE = os.path.join(TEMP_DIR, "locations.json")
+
+def _temp_dir():
+    """Return current TEMP_DIR (supports runtime patching)."""
+    return _paths.TEMP_DIR
+
+
+def _locations_file():
+    """Return current locations file path."""
+    return os.path.join(_temp_dir(), "locations.json")
+
+# Keep module-level LOCATIONS_FILE for backward compat / direct patching
+LOCATIONS_FILE = None  # set dynamically
 
 
 def generate_mesh(mode, x_0, y_0, distance):
@@ -37,10 +48,12 @@ def generate_mesh(mode, x_0, y_0, distance):
 
 def save_locations(locations):
     """Save borehole locations to JSON file in temp directory."""
-    os.makedirs(TEMP_DIR, exist_ok=True)
-    with open(LOCATIONS_FILE, "w") as f:
+    loc_file = LOCATIONS_FILE or _locations_file()
+    temp_dir = os.path.dirname(loc_file)
+    os.makedirs(temp_dir, exist_ok=True)
+    with open(loc_file, "w") as f:
         json.dump(locations, f, indent=2)
-    print(f"Locations saved to {LOCATIONS_FILE}")
+    print(f"Locations saved to {loc_file}")
 
 
 def load_locations():
@@ -49,12 +62,13 @@ def load_locations():
     Returns:
         list of [x, y] coordinate pairs.
     """
-    if not os.path.exists(LOCATIONS_FILE):
+    loc_file = LOCATIONS_FILE or _locations_file()
+    if not os.path.exists(loc_file):
         raise FileNotFoundError(
-            f"Locations file not found: {LOCATIONS_FILE}. "
+            f"Locations file not found: {loc_file}. "
             "Run mesh generation first."
         )
-    with open(LOCATIONS_FILE, "r") as f:
+    with open(loc_file, "r") as f:
         return json.load(f)
 
 
@@ -348,7 +362,7 @@ def geo_template_circles(EWS_dict, ms, ms_fine, x_len, y_len, x_0, y_0, radius):
 
 
 def meshing(EWS_dict):
-    with open(PARAMETER_FILE_SI, "r") as f:
+    with open(_paths.PARAMETER_FILE_SI, "r") as f:
         param = Box(json.load(f))
 
     # Create the .geo file
@@ -364,17 +378,19 @@ def meshing(EWS_dict):
     )
 
     # Write .geo file
-    geo_file_name = TEMP_DIR + "/temp_mesh.geo"
+    temp_dir = _temp_dir()
+    os.makedirs(temp_dir, exist_ok=True)
+    geo_file_name = temp_dir + "/temp_mesh.geo"
     with open(geo_file_name, "w") as geo_file:
         geo_file.write(template)
 
     # Run Gmsh
-    msh_file_name = TEMP_DIR + "temp_mesh.msh"  # Gmsh's default output file
+    msh_file_name = temp_dir + "/temp_mesh.msh"
     subprocess.run(["gmsh", "-2", geo_file_name, "-o",
                    msh_file_name, "-format", "msh2"])
 
     # Convert mesh to XML
-    xml_file_name = TEMP_DIR + "/temp_mesh.xml"
+    xml_file_name = temp_dir + "/temp_mesh.xml"
     subprocess.run(["dolfin-convert", msh_file_name, xml_file_name])
 
     # Clean up temporary files

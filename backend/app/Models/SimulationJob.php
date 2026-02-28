@@ -110,4 +110,31 @@ class SimulationJob extends Model
 
         return array_unique($files);
     }
+
+    /**
+     * Read the progress.json written by the Python simulation/mesh code.
+     *
+     * Returns an array with keys: phase, current_step, total_steps, percent, message
+     * or null when no progress file exists.
+     */
+    public function progress(): ?array
+    {
+        $file = $this->work_dir . '/progress.json';
+        if (!file_exists($file)) {
+            return null;
+        }
+
+        $data = @json_decode(@file_get_contents($file), true);
+        if (!is_array($data)) {
+            return null;
+        }
+
+        return [
+            'phase'        => $data['phase'] ?? null,
+            'current_step' => $data['current_step'] ?? 0,
+            'total_steps'  => $data['total_steps'] ?? 0,
+            'percent'      => $data['percent'] ?? 0,
+            'message'      => $data['message'] ?? '',
+        ];
+    }
 }

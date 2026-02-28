@@ -1,0 +1,19 @@
+# Dev / CI
+.git
+.devcontainer
+.github
+.vscode
+figures
+
+# Node modules (built in Docker)
+backend/node_modules
+backend/public/build
+
+# Development files
+backend/.env
+backend/storage/app/jobs/*
+backend/storage/logs/*
+backend/database/database.sqlite
+
+# Docker (avoid recursive context)
+docker-compose.yml

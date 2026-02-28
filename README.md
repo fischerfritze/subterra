@@ -5,25 +5,66 @@ This project requires FEniCS, gmsh and more.
 
 ## Setup with Docker Container
 
-### Build Docker Image
+### Voraussetzungen
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/USERNAME/subterra.git
-   cd subterra
-   ```
-   
-2. **Build the image:**
-   ```bash
-   docker build -t subterra:local -f .devcontainer/Dockerfile .
-   ```
+- [Docker](https://docs.docker.com/get-docker/) und [Docker Compose](https://docs.docker.com/compose/install/) (v2+)
+- Der Docker-Daemon muss laufen (`sudo systemctl start docker`)
 
-3. **Run the container:**
-   ```bash
-   docker run -it -v $(pwd):/home/SubTerra subterra:local /bin/bash
-   ```
+### 1. Repository klonen
 
-3. **Inside the container, run and modify your simulations**
+```bash
+git clone https://github.com/fischerfritze/subterra.git
+cd subterra
+```
+
+### 2. Docker-Images bauen
+
+```bash
+docker compose build
+```
+
+Dies baut zwei Images:
+- **subterra-backend** — Leichtgewichtiger PHP/Laravel-Container mit Vue-Frontend und Queue-Workern
+- **subterra-fenics** — Schweres wissenschaftliches Image (FEniCS + gmsh), wird nur On-Demand pro Job gestartet
+
+### 3. Container starten
+
+```bash
+docker compose up -d backend redis
+```
+
+### 4. Web-Frontend aufrufen
+
+Öffne im Browser:
+
+```
+http://localhost:8000
+```
+
+### 5. Container stoppen
+
+```bash
+docker compose down
+```
+
+Alle Job-Daten bleiben im Docker-Volume `subterra_jobs_data` erhalten.
+Um auch die Volumes zu löschen:
+
+```bash
+docker compose down -v
+```
+
+### Zusammenfassung aller Befehle
+
+| Aktion | Befehl |
+|---|---|
+| Images bauen | `docker compose build` |
+| Starten | `docker compose up -d backend redis` |
+| Frontend öffnen | `http://localhost:8000` |
+| Logs ansehen | `docker compose logs -f backend` |
+| Stoppen | `docker compose down` |
+| Stoppen + Daten löschen | `docker compose down -v` |
+| Nur FEniCS-Image neu bauen | `docker compose build fenics` |
 
 ## Functionality
 
@@ -75,23 +116,34 @@ $$
 
 ```
 subterra/
-├── Dockerfile              # Docker image definition 
-├── main.py                 # Main routine
-├── requirements.txt        # Python dependencies
-├── params/                 # Parameter files
-│   ├── parameter.json      # Input parameters
-│   ├── parameter_si.json   # Auto-generated SI units
-│   └── temp/               # Temporary mesh files
-├── src/                    # Core packages
-│   ├── calculation.py      # Main simulation with FEniCS
-│   ├── convert_to_si.py    # Parameter unit conversion
-│   ├── h5py_writer.py      # HDF5 setup
-│   ├── mesh.py             # Mesh handling utilities
-│   ├── plot.py             # Visualization functions
-│   ├── powerprofile.py     # Power profile calculations
-│   ├── paths.py            # Path 
-│   └── tools.py            # Helper functions
-└── results/                # Output directory
+├── docker-compose.yml          # Docker Compose Orchestrierung
+├── docker/
+│   ├── backend/
+│   │   ├── Dockerfile          # Laravel + Vue Container
+│   │   ├── entrypoint.sh       # Env-Sync für supervisord
+│   │   └── supervisord.conf    # Web-Server + Queue-Worker
+│   ├── fenics/
+│   │   └── Dockerfile          # FEniCS + gmsh Container
+│   └── entrypoint.sh           # FEniCS Container Entrypoint
+├── backend/                    # Laravel 10 API + Vue 3 SPA
+│   ├── app/
+│   │   ├── Http/Controllers/   # API-Controller
+│   │   ├── Jobs/               # Queue-Jobs (Mesh, Simulation)
+│   │   └── Models/             # Eloquent-Models
+│   ├── resources/js/           # Vue 3 Frontend
+│   └── routes/api.php          # API-Routen
+├── src/                        # Python-Simulationscode
+│   ├── main.py                 # Hauptroutine
+│   ├── mesh_runner.py          # Mesh-Generierung
+│   └── simulation/
+│       ├── calculation.py      # FEniCS-Simulation
+│       ├── mesh.py             # Mesh-Utilities
+│       ├── powerprofile.py     # Leistungsprofil
+│       └── utils/              # Pfade, Konvertierung, H5-Writer
+├── params/                     # Parameter-Dateien
+│   ├── parameter.json          # Eingabeparameter
+│   └── parameter_si.json       # Auto-generierte SI-Einheiten
+└── results/                    # Simulationsergebnisse
 ```
 
 ## Usage
