@@ -11,13 +11,15 @@ COPY requirements.txt /subterra/requirements.txt
 
 # Install gmsh (Python API) and extra dependencies not in the base image.
 # DOLFINx image provides: dolfinx, basix, ufl, ffcx, petsc4py, mpi4py,
-# numpy, scipy, h5py, matplotlib, sympy.
+# numpy, h5py, matplotlib, sympy.
 RUN pip install --no-cache-dir \
     gmsh \
     alive-progress \
     python-box \
     psutil \
-    || true
+    scipy \
+    h5py \
+    matplotlib
 
 # Copy and prepare entrypoint
 COPY docker/entrypoint.sh /subterra/entrypoint.sh

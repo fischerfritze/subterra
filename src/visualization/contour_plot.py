@@ -1,6 +1,8 @@
 from os import makedirs, path
 from typing import Optional, Tuple
 
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from h5py import File
 from matplotlib.tri import Triangulation

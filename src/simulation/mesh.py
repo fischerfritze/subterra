@@ -225,14 +225,14 @@ def meshing(EWS_dict):
     # Mesh size field: refine around BHE points
     # ------------------------------------------------------------------
     gmsh.model.mesh.field.add("Distance", 1)
-    gmsh.model.mesh.field.setNumbers("Distance", 1, "PointsList", bhe_point_tags)
+    gmsh.model.mesh.field.setNumbers(1, "PointsList", bhe_point_tags)
 
     gmsh.model.mesh.field.add("Threshold", 2)
-    gmsh.model.mesh.field.setNumber("Threshold", 2, "InField", 1)
-    gmsh.model.mesh.field.setNumber("Threshold", 2, "SizeMin", ms_fine)
-    gmsh.model.mesh.field.setNumber("Threshold", 2, "SizeMax", ms)
-    gmsh.model.mesh.field.setNumber("Threshold", 2, "DistMin", 0)
-    gmsh.model.mesh.field.setNumber("Threshold", 2, "DistMax", 30)
+    gmsh.model.mesh.field.setNumber(2, "InField", 1)
+    gmsh.model.mesh.field.setNumber(2, "SizeMin", ms_fine)
+    gmsh.model.mesh.field.setNumber(2, "SizeMax", ms)
+    gmsh.model.mesh.field.setNumber(2, "DistMin", 0)
+    gmsh.model.mesh.field.setNumber(2, "DistMax", 30)
 
     gmsh.model.mesh.field.setAsBackgroundMesh(2)
 

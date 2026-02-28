@@ -2,7 +2,6 @@
 
 namespace App\Jobs;
 
-use App\Jobs\RunPlotGeneration;
 use App\Models\SimulationJob;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -13,15 +12,11 @@ use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
 
-class RunSimulation implements ShouldQueue
+class RunPlotGeneration implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    /**
-     * Max execution time in seconds (long-running simulations).
-     */
-    public int $timeout = 7200; // 2 hours
-
+    public int $timeout = 600; // 10 minutes
     public int $tries = 1;
 
     public function __construct(
@@ -33,66 +28,40 @@ class RunSimulation implements ShouldQueue
         $job = $this->simulationJob;
 
         try {
-            // Verify mesh exists
-            if (!$job->hasMesh()) {
-                throw new \RuntimeException(
-                    "Mesh files not found. Run mesh generation first."
-                );
-            }
-
-            $job->update([
-                'status'         => SimulationJob::STATUS_SIMULATING,
-                'sim_started_at' => now(),
-            ]);
-
-            Log::info("Simulation started for job {$job->id}");
+            Log::info("Plot generation started for job {$job->id}");
 
             $result = $this->runProcess($job);
 
             // Append stdout/stderr to job.log
-            $this->appendLog($job, "[SIMULATION] stdout:\n" . $result->output());
+            $this->appendLog($job, "[PLOT] stdout:\n" . $result->output());
             if ($result->errorOutput()) {
-                $this->appendLog($job, "[SIMULATION] stderr:\n" . $result->errorOutput());
+                $this->appendLog($job, "[PLOT] stderr:\n" . $result->errorOutput());
             }
 
             if ($result->successful()) {
-                $job->update([
-                    'status'           => SimulationJob::STATUS_COMPLETED,
-                    'sim_completed_at' => now(),
-                ]);
-                Log::info("Simulation completed for job {$job->id}");
-
-                // Automatically generate contour plots
-                RunPlotGeneration::dispatch($job);
+                Log::info("Plot generation completed for job {$job->id}");
             } else {
-                throw new \RuntimeException(
-                    "Simulation failed:\n" . $result->errorOutput() . "\n" . $result->output()
+                Log::warning(
+                    "Plot generation had issues for job {$job->id}: "
+                    . $result->errorOutput()
                 );
             }
         } catch (\Throwable $e) {
-            $job->update([
-                'status'        => SimulationJob::STATUS_FAILED,
-                'error_message' => substr($e->getMessage(), 0, 5000),
-            ]);
-            Log::error("Simulation failed for job {$job->id}: {$e->getMessage()}");
-            throw $e;
+            // Plot generation failure should not fail the overall job
+            Log::error("Plot generation failed for job {$job->id}: {$e->getMessage()}");
         }
     }
 
     private function runProcess(SimulationJob $job): \Illuminate\Process\ProcessResult
     {
         $mode = config('subterra.runner_mode', 'docker');
-
         if ($mode === 'local') {
             return $this->runLocal($job);
         }
-
-        $containerName = "subterra-sim-{$job->id}";
+        $containerName = "subterra-plot-{$job->id}";
         Process::run("docker rm -f {$containerName} 2>/dev/null");
 
-        return Process::timeout($this->timeout)->run(
-            $this->buildDockerCommand($job)
-        );
+        return Process::timeout($this->timeout)->run($this->buildDockerCommand($job));
     }
 
     private function runLocal(SimulationJob $job): \Illuminate\Process\ProcessResult
@@ -100,13 +69,11 @@ class RunSimulation implements ShouldQueue
         $projectRoot = config('subterra.project_root');
         $paramFile   = $job->parameterFilePath();
 
-        // Use env PATH=... prefix so the full parent environment is preserved
-        // (FEniCS/DOLFIN needs MPI, LD_LIBRARY_PATH, etc.)
         return Process::timeout($this->timeout)
             ->path($projectRoot)
             ->run(implode(' ', [
                 'env', 'PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
-                'python3', '-m', 'src.sim_runner',
+                'python3', '-m', 'src.plot_runner',
                 '--params', escapeshellarg($paramFile),
             ]));
     }
@@ -119,11 +86,11 @@ class RunSimulation implements ShouldQueue
 
         return implode(' ', [
             'docker', 'run', '--rm',
-            '--name', "subterra-sim-{$jobId}",
+            '--name', "subterra-plot-{$jobId}",
             '-v', "{$volume}:/subterra/jobs",
             '-e', "JOB_ID={$jobId}",
             $image,
-            'python3', '-m', 'src.sim_runner',
+            'python3', '-m', 'src.plot_runner',
             '--params', "/subterra/jobs/{$jobId}/parameter.json",
         ]);
     }

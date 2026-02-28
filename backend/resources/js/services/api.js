@@ -44,8 +44,31 @@ export default {
         return api.post(`/jobs/${id}/run`);
     },
 
+    generatePlots(id) {
+        return api.post(`/jobs/${id}/plot`);
+    },
+
+    // Job log
+    getJobLog(id) {
+        return api.get(`/jobs/${id}/log`);
+    },
+
+    // Mesh plot
+    getMeshPlotUrl(id) {
+        return `/api/jobs/${id}/mesh-plot`;
+    },
+
     // Results
     getResultUrl(id, filename) {
         return `/api/jobs/${id}/results/${filename}`;
+    },
+
+    // Plots
+    getPlotUrl(id, filename) {
+        return `/api/jobs/${id}/plots/${filename}`;
+    },
+
+    getPlotDownloadUrl(id, filename) {
+        return `/api/jobs/${id}/plots/${filename}/download`;
     },
 };

@@ -92,6 +92,14 @@ class SimulationJob extends Model
     }
 
     /**
+     * Path to the plots directory.
+     */
+    public function plotsDir(): string
+    {
+        return $this->resultsDir() . '/plots';
+    }
+
+    /**
      * Get result files list.
      */
     public function resultFiles(): array
@@ -111,6 +119,25 @@ class SimulationJob extends Model
         }
 
         return array_unique($files);
+    }
+
+    /**
+     * Get list of generated plot PNG files.
+     */
+    public function plotFiles(): array
+    {
+        $dir = $this->plotsDir();
+        if (!is_dir($dir)) {
+            return [];
+        }
+
+        $files = [];
+        foreach (glob($dir . '/*.png') ?: [] as $f) {
+            $files[] = basename($f);
+        }
+        sort($files);
+
+        return $files;
     }
 
     /**
@@ -138,5 +165,38 @@ class SimulationJob extends Model
             'percent'      => $data['percent'] ?? 0,
             'message'      => $data['message'] ?? '',
         ];
+    }
+
+    /**
+     * Read the job.log file written by queue workers.
+     */
+    public function jobLog(int $maxBytes = 512000): string
+    {
+        $file = $this->work_dir . '/job.log';
+        if (!file_exists($file)) {
+            return '';
+        }
+
+        $size = filesize($file);
+        if ($size <= $maxBytes) {
+            return file_get_contents($file) ?: '';
+        }
+
+        // Tail the file for large logs
+        $fp = fopen($file, 'r');
+        fseek($fp, -$maxBytes, SEEK_END);
+        fgets($fp); // skip partial line
+        $content = "... (truncated) ...\n" . fread($fp, $maxBytes);
+        fclose($fp);
+        return $content;
+    }
+
+    /**
+     * Check if a mesh plot PNG exists.
+     */
+    public function meshPlotFile(): ?string
+    {
+        $file = $this->tempDir() . '/mesh_plot.png';
+        return file_exists($file) ? 'mesh_plot.png' : null;
     }
 }

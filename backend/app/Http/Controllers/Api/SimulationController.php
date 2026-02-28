@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreParameterRequest;
 use App\Jobs\RunMeshGeneration;
+use App\Jobs\RunPlotGeneration;
 use App\Jobs\RunSimulation;
 use App\Models\SimulationJob;
 use Illuminate\Http\JsonResponse;
@@ -88,7 +89,9 @@ class SimulationController extends Controller
             'status'             => $job->status,
             'parameters'         => $job->parameters,
             'has_mesh'           => $job->hasMesh(),
+            'mesh_plot'          => $job->meshPlotFile(),
             'result_files'       => $job->resultFiles(),
+            'plot_files'         => $job->plotFiles(),
             'progress'           => $job->progress(),
             'error_message'      => $job->error_message,
             'mesh_started_at'    => $job->mesh_started_at,
@@ -200,6 +203,103 @@ class SimulationController extends Controller
         }
 
         return response()->download($found);
+    }
+
+    /**
+     * GET /api/jobs/{id}/log
+     * Return the job's console output log.
+     */
+    public function log(SimulationJob $job): JsonResponse
+    {
+        return response()->json([
+            'log' => $job->jobLog(),
+        ]);
+    }
+
+    /**
+     * GET /api/jobs/{id}/mesh-plot
+     * Serve the mesh visualization PNG.
+     */
+    public function serveMeshPlot(SimulationJob $job): mixed
+    {
+        $plotFile = $job->meshPlotFile();
+        if (!$plotFile) {
+            return response()->json(['error' => 'Mesh plot not found.'], 404);
+        }
+
+        $plotPath = $job->tempDir() . '/' . $plotFile;
+        return response()->file($plotPath, [
+            'Content-Type' => 'image/png',
+        ]);
+    }
+
+    /**
+     * POST /api/jobs/{id}/plot
+     * Dispatch plot generation for a completed job.
+     */
+    public function plot(SimulationJob $job): JsonResponse
+    {
+        if ($job->status !== SimulationJob::STATUS_COMPLETED) {
+            return response()->json([
+                'error' => 'Simulation not completed yet.',
+            ], 422);
+        }
+
+        RunPlotGeneration::dispatch($job);
+
+        return response()->json([
+            'id'      => $job->id,
+            'message' => 'Plot generation queued.',
+        ]);
+    }
+
+    /**
+     * GET /api/jobs/{id}/plots/{filename}
+     * Serve a plot image inline.
+     */
+    public function servePlot(SimulationJob $job, string $filename): mixed
+    {
+        if ($job->status !== SimulationJob::STATUS_COMPLETED) {
+            return response()->json([
+                'error' => 'Simulation not completed yet.',
+            ], 422);
+        }
+
+        // Sanitize filename to prevent directory traversal
+        $filename = basename($filename);
+        $plotPath = $job->plotsDir() . '/' . $filename;
+
+        if (!file_exists($plotPath)) {
+            return response()->json(['error' => 'Plot not found.'], 404);
+        }
+
+        return response()->file($plotPath, [
+            'Content-Type' => 'image/png',
+        ]);
+    }
+
+    /**
+     * GET /api/jobs/{id}/plots/{filename}/download
+     * Download a plot image as attachment.
+     */
+    public function downloadPlot(SimulationJob $job, string $filename): mixed
+    {
+        if ($job->status !== SimulationJob::STATUS_COMPLETED) {
+            return response()->json([
+                'error' => 'Simulation not completed yet.',
+            ], 422);
+        }
+
+        $filename = basename($filename);
+        $plotPath = $job->plotsDir() . '/' . $filename;
+
+        if (!file_exists($plotPath)) {
+            return response()->json(['error' => 'Plot not found.'], 404);
+        }
+
+        return response()->download($plotPath, $filename, [
+            'Content-Type' => 'image/png',
+        ]);
     }
 
     /**

@@ -1,6 +1,9 @@
 import numpy as np
 from src.simulation.utils.paths import RESULTS_DIR, PARAMETER_FILE, TEMP_DIR, BASE_DIR
-from scipy.integrate import simps
+try:
+    from scipy.integrate import simps
+except ImportError:
+    from scipy.integrate import simpson as simps
 import os
 
 

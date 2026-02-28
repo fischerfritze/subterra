@@ -27,7 +27,16 @@ Route::delete('/jobs/{job}', [SimulationController::class, 'destroy']);
 Route::post('/jobs/{job}/mesh',     [SimulationController::class, 'mesh']);
 Route::post('/jobs/{job}/simulate', [SimulationController::class, 'simulate']);
 Route::post('/jobs/{job}/run',      [SimulationController::class, 'run']);
+Route::post('/jobs/{job}/plot',     [SimulationController::class, 'plot']);
+
+// Job log & mesh plot
+Route::get('/jobs/{job}/log',       [SimulationController::class, 'log']);
+Route::get('/jobs/{job}/mesh-plot', [SimulationController::class, 'serveMeshPlot']);
 
 // Result download
 Route::get('/jobs/{job}/results/{filename}', [SimulationController::class, 'downloadResult'])
     ->where('filename', '.*');
+
+// Plot image serving & download
+Route::get('/jobs/{job}/plots/{filename}/download', [SimulationController::class, 'downloadPlot']);
+Route::get('/jobs/{job}/plots/{filename}',          [SimulationController::class, 'servePlot']);

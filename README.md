@@ -65,6 +65,8 @@ docker compose down -v
 | Stoppen | `docker compose down` |
 | Stoppen + Daten löschen | `docker compose down -v` |
 | Nur FEniCS-Image neu bauen | `docker compose build fenics` |
+| **Code aktualisieren & neustarten** | `docker compose down && docker compose build && docker compose up -d backend redis` |
+| **Komplett neu bauen & starten** | `docker compose down --remove-orphans && docker compose build --no-cache && docker compose up -d backend redis` |
 
 ## Functionality
 

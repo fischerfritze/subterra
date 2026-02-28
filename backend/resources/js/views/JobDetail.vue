@@ -42,6 +42,24 @@
         </table>
       </div>
 
+      <!-- Console output -->
+      <div class="card" v-if="showConsole">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+          <h2 style="margin-bottom: 0;">Konsole</h2>
+          <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <label style="font-size: 0.75rem; color: var(--text-muted); display: flex; align-items: center; gap: 0.3rem;">
+              <input type="checkbox" v-model="autoScrollLog" /> Auto-Scroll
+            </label>
+            <button class="btn btn-sm" @click="fetchLog" :disabled="logLoading">
+              {{ logLoading ? '...' : '↻ Aktualisieren' }}
+            </button>
+          </div>
+        </div>
+        <div class="console" ref="consoleEl">
+          <pre class="console-text">{{ logText || 'Warte auf Ausgabe...' }}</pre>
+        </div>
+      </div>
+
       <!-- Actions -->
       <div class="card" v-if="showActions">
         <h2>Aktionen</h2>
@@ -69,6 +87,64 @@
             </a>
           </li>
         </ul>
+      </div>
+
+      <!-- Contour Plots -->
+      <div class="card" v-if="job.status === 'completed'">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+          <h2 style="margin-bottom: 0;">Contour Plots</h2>
+          <button v-if="!hasPlots" class="btn btn-primary btn-sm" @click="onGeneratePlots" :disabled="plotBusy">
+            <span v-if="plotBusy" class="spinner" style="margin-right: .3rem;"></span>
+            Plots generieren
+          </button>
+          <button v-else class="btn btn-sm" @click="onRegeneratePlots" :disabled="plotBusy">
+            <span v-if="plotBusy" class="spinner" style="margin-right: .3rem;"></span>
+            Plots neu generieren
+          </button>
+        </div>
+
+        <div v-if="!hasPlots && !plotBusy" class="plot-empty">
+          Noch keine Plots vorhanden. Klicke auf „Plots generieren" oder warte kurz —
+          Plots werden nach der Simulation automatisch erstellt.
+        </div>
+
+        <div v-if="!hasPlots && plotBusy" style="text-align: center; padding: 1rem;">
+          <span class="spinner"></span> Plots werden generiert...
+        </div>
+
+        <div v-if="hasPlots" class="plot-gallery">
+          <div v-for="plot in job.plot_files" :key="plot" class="plot-item">
+            <div class="plot-image-wrapper">
+              <img
+                :src="plotUrl(plot)"
+                :alt="plot"
+                class="plot-image"
+                loading="lazy"
+                @click="openPlotFullscreen(plot)"
+              />
+            </div>
+            <div class="plot-actions">
+              <span class="plot-filename">{{ plot }}</span>
+              <a :href="plotDownloadUrl(plot)" class="btn btn-sm btn-primary" download>
+                ⬇ PNG
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Fullscreen plot overlay -->
+      <div v-if="fullscreenPlot" class="plot-overlay" @click="fullscreenPlot = null">
+        <div class="plot-overlay-content" @click.stop>
+          <img :src="plotUrl(fullscreenPlot)" :alt="fullscreenPlot" class="plot-overlay-image" />
+          <div class="plot-overlay-actions">
+            <span>{{ fullscreenPlot }}</span>
+            <a :href="plotDownloadUrl(fullscreenPlot)" class="btn btn-sm btn-primary" download>
+              ⬇ PNG herunterladen
+            </a>
+            <button class="btn btn-sm" @click="fullscreenPlot = null">Schließen</button>
+          </div>
+        </div>
       </div>
 
       <!-- Parameters -->
@@ -99,7 +175,14 @@ export default {
       job: null,
       loading: true,
       busy: false,
+      plotBusy: false,
       pollTimer: null,
+      logPollTimer: null,
+      plotPollTimer: null,
+      fullscreenPlot: null,
+      logText: '',
+      logLoading: false,
+      autoScrollLog: true,
     };
   },
 
@@ -125,21 +208,47 @@ export default {
     isRunning() {
       return ['meshing', 'simulating'].includes(this.job?.status);
     },
+    hasPlots() {
+      return this.job?.plot_files && this.job.plot_files.length > 0;
+    },
+    showConsole() {
+      return this.job && this.job.status !== 'pending';
+    },
+    meshPlotUrl() {
+      return this.job ? api.getMeshPlotUrl(this.job.id) : '';
+    },
   },
 
   async mounted() {
     await this.fetchJob();
+    await this.fetchLog();
     this.startPolling();
+    this.startLogPolling();
   },
 
   beforeUnmount() {
     this.stopPolling();
+    this.stopLogPolling();
+    this.stopPlotPolling();
   },
 
   watch: {
     isRunning(val) {
-      if (val) this.startPolling();
-      else this.stopPolling();
+      if (val) {
+        this.startPolling();
+        this.startLogPolling();
+      } else {
+        this.stopPolling();
+        // Fetch log one last time after completion
+        setTimeout(() => this.fetchLog(), 2000);
+        setTimeout(() => this.stopLogPolling(), 5000);
+      }
+    },
+    'job.status'(newStatus, oldStatus) {
+      // When transitioning to completed, fetch log once more
+      if (newStatus === 'completed' && oldStatus !== 'completed') {
+        setTimeout(() => this.fetchLog(), 3000);
+      }
     },
   },
 
@@ -153,6 +262,24 @@ export default {
         this.job = null;
       } finally {
         this.loading = false;
+      }
+    },
+
+    async fetchLog() {
+      if (!this.job) return;
+      this.logLoading = true;
+      try {
+        const { data } = await api.getJobLog(this.job.id);
+        this.logText = data.log || '';
+        this.$nextTick(() => {
+          if (this.autoScrollLog && this.$refs.consoleEl) {
+            this.$refs.consoleEl.scrollTop = this.$refs.consoleEl.scrollHeight;
+          }
+        });
+      } catch (err) {
+        // Ignore log fetch errors
+      } finally {
+        this.logLoading = false;
       }
     },
 
@@ -170,11 +297,25 @@ export default {
       }
     },
 
+    startLogPolling() {
+      if (this.logPollTimer) return;
+      this.logPollTimer = setInterval(this.fetchLog, 4000);
+    },
+
+    stopLogPolling() {
+      if (this.logPollTimer) {
+        clearInterval(this.logPollTimer);
+        this.logPollTimer = null;
+      }
+    },
+
     async onRun() {
       this.busy = true;
+      this.logText = '';
       try {
         await api.startRun(this.job.id);
         await this.fetchJob();
+        this.startLogPolling();
       } catch (err) {
         alert(err.response?.data?.error || 'Fehler beim Starten.');
       } finally {
@@ -184,9 +325,11 @@ export default {
 
     async onMesh() {
       this.busy = true;
+      this.logText = '';
       try {
         await api.startMesh(this.job.id);
         await this.fetchJob();
+        this.startLogPolling();
       } catch (err) {
         alert(err.response?.data?.error || 'Fehler beim Mesh-Start.');
       } finally {
@@ -199,6 +342,7 @@ export default {
       try {
         await api.startSimulation(this.job.id);
         await this.fetchJob();
+        this.startLogPolling();
       } catch (err) {
         alert(err.response?.data?.error || 'Fehler beim Simulations-Start.');
       } finally {
@@ -218,6 +362,55 @@ export default {
 
     resultUrl(filename) {
       return api.getResultUrl(this.job.id, filename);
+    },
+
+    plotUrl(filename) {
+      return api.getPlotUrl(this.job.id, filename);
+    },
+
+    plotDownloadUrl(filename) {
+      return api.getPlotDownloadUrl(this.job.id, filename);
+    },
+
+    openPlotFullscreen(filename) {
+      this.fullscreenPlot = filename;
+    },
+
+    async onGeneratePlots() {
+      this.plotBusy = true;
+      try {
+        await api.generatePlots(this.job.id);
+        this.startPlotPolling();
+      } catch (err) {
+        alert(err.response?.data?.error || 'Fehler beim Plot-Start.');
+        this.plotBusy = false;
+      }
+    },
+
+    async onRegeneratePlots() {
+      await this.onGeneratePlots();
+    },
+
+    startPlotPolling() {
+      if (this.plotPollTimer) return;
+      this.plotPollTimer = setInterval(async () => {
+        await this.fetchJob();
+        if (this.hasPlots) {
+          this.stopPlotPolling();
+          this.plotBusy = false;
+        }
+      }, 5000);
+      setTimeout(() => {
+        this.stopPlotPolling();
+        this.plotBusy = false;
+      }, 300000);
+    },
+
+    stopPlotPolling() {
+      if (this.plotPollTimer) {
+        clearInterval(this.plotPollTimer);
+        this.plotPollTimer = null;
+      }
     },
 
     formatDate(dateStr) {
@@ -260,5 +453,131 @@ export default {
   font-size: 0.85rem;
   max-height: 400px;
   overflow-y: auto;
+}
+
+/* Plot gallery */
+.plot-empty {
+  text-align: center;
+  padding: 1.5rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+.plot-gallery {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+.plot-item {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: #fafafa;
+}
+.plot-image-wrapper {
+  padding: 0.5rem;
+  text-align: center;
+  background: white;
+  cursor: pointer;
+}
+.plot-image {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+  transition: transform 0.2s;
+}
+.plot-image:hover {
+  transform: scale(1.01);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+.plot-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  border-top: 1px solid var(--border);
+  background: var(--bg, #f5f5f5);
+}
+.plot-filename {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Fullscreen overlay */
+.plot-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+.plot-overlay-content {
+  max-width: 95vw;
+  max-height: 95vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+.plot-overlay-image {
+  max-width: 100%;
+  max-height: 80vh;
+  border-radius: 8px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+}
+.plot-overlay-actions {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  color: white;
+  font-size: 0.9rem;
+}
+
+/* Console */
+.console {
+  background: #1e1e1e;
+  border: 1px solid #333;
+  border-radius: var(--radius);
+  max-height: 400px;
+  min-height: 120px;
+  overflow-y: auto;
+  overflow-x: auto;
+  scrollbar-color: #555 #1e1e1e;
+}
+.console-text {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  font-family: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', 'Monaco', monospace;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: #d4d4d4;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.btn-sm {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.6rem;
+}
+
+/* Mesh plot */
+.mesh-plot-wrapper {
+  text-align: center;
+  padding: 0.5rem;
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.mesh-plot-image {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
 }
 </style>

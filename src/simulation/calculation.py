@@ -178,12 +178,16 @@ def _eval_at_points_batch(mesh, T_func, points_2d):
 
     cell_candidates = compute_collisions_points(_cached_tree, pts3d)
     for i in range(len(points_2d)):
-        cells_i = compute_colliding_cells(mesh, cell_candidates, pts3d[i:i+1])
-        links = cells_i.links(0)
-        if len(links) == 0:
+        try:
+            cells_i = compute_colliding_cells(mesh, cell_candidates, pts3d[i:i+1])
+            links = cells_i.links(0)
+            if len(links) == 0:
+                results[i] = float('nan')
+            else:
+                results[i] = T_func.eval(pts3d[i:i+1], links[0])[0]
+        except RuntimeError:
+            # GJK collision detection can fail for points near mesh boundaries
             results[i] = float('nan')
-        else:
-            results[i] = T_func.eval(pts3d[i:i+1], links[0])[0]
 
     return results
 
@@ -275,8 +279,9 @@ def _run_simulation(params: Box, params_si: Box):
     #########################
 
     try:
-        max_distance = mesh.h(mesh.topology.dim, range(
-            mesh.topology.index_map(mesh.topology.dim).size_local)).max()
+        num_cells = mesh.topology.index_map(mesh.topology.dim).size_local
+        max_distance = mesh.h(mesh.topology.dim, np.arange(
+            num_cells, dtype=np.int32)).max()
         max_velocity = max(params_si.groundwater.velocityX.value,
                            params_si.groundwater.velocityY.value)
 
