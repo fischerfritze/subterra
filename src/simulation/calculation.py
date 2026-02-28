@@ -18,6 +18,7 @@ from src.simulation.utils.convert_to_si import run_conversion
 
 
 def run_calculation():
+    """Legacy entry point: runs SI conversion, mesh generation, and simulation."""
 
     # SI-conversion of parameter file
     try:
@@ -36,10 +37,37 @@ def run_calculation():
     with open(PARAMETER_FILE, "r") as f:
         params = Box(json.load(f))
 
-    return _run_calculation(params, params_si)
+    # Generate mesh (legacy: all-in-one)
+    msh.generate_mesh(
+        mode=tuple(params_si.meshMode),
+        x_0=params_si.mesh.xCenter.value,
+        y_0=params_si.mesh.yCenter.value,
+        distance=params_si.mesh.boreholeDistance.value
+    )
+
+    return run_simulation(params, params_si)
 
 
-def _run_calculation(params: Box, params_si: Box):
+def run_simulation(params: Box = None, params_si: Box = None):
+    """Run the FEniCS simulation using a previously generated mesh.
+    
+    Loads mesh and borehole locations from params/temp/.
+    If params/params_si are not provided, loads them from the default paths.
+    """
+    if params is None:
+        with open(PARAMETER_FILE, "r") as f:
+            params = Box(json.load(f))
+    if params_si is None:
+        # Ensure SI file exists
+        if not path.exists(PARAMETER_FILE_SI):
+            run_conversion(PARAMETER_FILE, PARAMETER_FILE_SI)
+        with open(PARAMETER_FILE_SI, "r") as f:
+            params_si = Box(json.load(f))
+
+    return _run_simulation(params, params_si)
+
+
+def _run_simulation(params: Box, params_si: Box):
 
     TEMP_MESH_PATH = path.join(TEMP_DIR, "temp_mesh.xml")
     TEMP_MESH_FACET_REGION_PATH = path.join(
@@ -48,7 +76,11 @@ def _run_calculation(params: Box, params_si: Box):
     base_folder = path.join(RESULTS_DIR, folder_name)
     makedirs(base_folder, exist_ok=True)
 
-    print(f"Starting calculation with parameters from {PARAMETER_FILE_SI}")
+    print(f"Starting simulation with parameters from {PARAMETER_FILE_SI}")
+
+    # Load borehole locations from previously generated mesh
+    locations_raw = msh.load_locations()
+    locations = [fenics.Point(loc[0], loc[1]) for loc in locations_raw]
 
     # TODO: Remove unused variables
     # create powerprofile: A - B * cos(2 * pi / 365 * days)
@@ -58,13 +90,12 @@ def _run_calculation(params: Box, params_si: Box):
         years=params.time.simulationYears.value
     )
 
-    # create meshgrid
-    locations = msh.generate_mesh(
-        mode=tuple(params_si.meshMode),
-        x_0=params_si.mesh.xCenter.value,
-        y_0=params_si.mesh.yCenter.value,
-        distance=params_si.mesh.boreholeDistance.value
-    )
+    # Load mesh from temp directory
+    if not path.exists(TEMP_MESH_PATH):
+        raise FileNotFoundError(
+            f"Mesh file not found: {TEMP_MESH_PATH}. "
+            "Run mesh generation first (python -m src.mesh_runner)."
+        )
 
     mesh = fenics.Mesh(TEMP_MESH_PATH)
     fd = fenics.MeshFunction('size_t', mesh, TEMP_MESH_FACET_REGION_PATH)
