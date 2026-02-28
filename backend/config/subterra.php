@@ -57,4 +57,15 @@ return [
     */
     'container_work_mount' => '/subterra/work',
 
+    /*
+    |--------------------------------------------------------------------------
+    | MPI Cores
+    |--------------------------------------------------------------------------
+    |
+    | Number of MPI processes for parallel FEniCSx simulation.
+    | Set to 1 for serial execution.
+    |
+    */
+    'mpi_cores' => (int) env('SUBTERRA_MPI_CORES', 4),
+
 ];

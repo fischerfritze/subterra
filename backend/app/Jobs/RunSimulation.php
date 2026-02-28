@@ -115,6 +115,7 @@ class RunSimulation implements ShouldQueue
     {
         $image  = config('subterra.fenics_container', 'subterra-fenics');
         $volume = config('subterra.docker_jobs_volume', 'subterra_jobs_data');
+        $cores  = config('subterra.mpi_cores', 4);
         $jobId  = $job->id;
 
         return implode(' ', [
@@ -123,6 +124,8 @@ class RunSimulation implements ShouldQueue
             '-v', "{$volume}:/subterra/jobs",
             '-e', "JOB_ID={$jobId}",
             $image,
+            'mpirun',
+            '-np', (string) $cores,
             'python3', '-m', 'src.sim_runner',
             '--params', "/subterra/jobs/{$jobId}/parameter.json",
         ]);

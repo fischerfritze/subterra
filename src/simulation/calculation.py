@@ -197,7 +197,15 @@ def _eval_at_points_batch(mesh, T_func, points_2d):
 # ---------------------------------------------------------------------------
 
 def _run_simulation(params: Box, params_si: Box):
-    """DOLFINx implementation of the transient heat-transport solver."""
+    """DOLFINx implementation of the transient heat-transport solver.
+
+    Fully MPI-parallel: can be launched via
+        mpirun -np N python3 -m src.sim_runner --params ...
+    All I/O (HDF5, progress, prints) is funnelled to rank 0.
+    """
+
+    comm = MPI.COMM_WORLD
+    rank = comm.rank
 
     TEMP_MESH_PATH = path.join(_paths.TEMP_DIR, "temp_mesh.msh")
     folder_name = (
@@ -206,10 +214,14 @@ def _run_simulation(params: Box, params_si: Box):
         f"_{params_si.time.simulationYears.value}years"
     )
     base_folder = path.join(_paths.RESULTS_DIR, folder_name)
-    makedirs(base_folder, exist_ok=True)
+    if rank == 0:
+        makedirs(base_folder, exist_ok=True)
+    comm.Barrier()
 
-    print(f"Starting simulation with parameters from {_paths.PARAMETER_FILE_SI}")
-    _write_progress('simulation', 0, 1, 'Simulation wird vorbereitet...')
+    if rank == 0:
+        print(f"Starting simulation with parameters from {_paths.PARAMETER_FILE_SI}")
+        print(f"MPI parallel: {comm.size} process(es)")
+        _write_progress('simulation', 0, 1, 'Simulation wird vorbereitet...')
 
     # ------------------------------------------------------------------
     # Load borehole locations
@@ -280,8 +292,9 @@ def _run_simulation(params: Box, params_si: Box):
 
     try:
         num_cells = mesh.topology.index_map(mesh.topology.dim).size_local
-        max_distance = mesh.h(mesh.topology.dim, np.arange(
-            num_cells, dtype=np.int32)).max()
+        local_max_h = mesh.h(mesh.topology.dim, np.arange(
+            num_cells, dtype=np.int32)).max() if num_cells > 0 else 0.0
+        max_distance = comm.allreduce(local_max_h, op=MPI.MAX)
         max_velocity = max(params_si.groundwater.velocityX.value,
                            params_si.groundwater.velocityY.value)
 
@@ -336,23 +349,28 @@ def _run_simulation(params: Box, params_si: Box):
                 raise RuntimeWarning(
                     f"peclet_number_max = {peclet_number:.2f}\n"
                     "Warning: calculation numerically unstable")
-            print(f"peclet_number_max = {peclet_number:.2f}")
+            if rank == 0:
+                print(f"peclet_number_max = {peclet_number:.2f}")
 
         else:
             neumann_number = diffusionCoefficient * dt / (max_distance ** 2)
-            print(f"Ne_max = {neumann_number:.2f}")
+            if rank == 0:
+                print(f"Ne_max = {neumann_number:.2f}")
 
     except ValueError as e:
-        print(f"Value error:\n {e}")
-        traceback.print_exc()
+        if rank == 0:
+            print(f"Value error:\n {e}")
+            traceback.print_exc()
         exit(1)
     except RuntimeWarning as e:
-        print(f"Numerical issue for ground parameters:\n {e}")
-        traceback.print_exc()
+        if rank == 0:
+            print(f"Numerical issue for ground parameters:\n {e}")
+            traceback.print_exc()
         exit(1)
     except Exception as e:
-        print(f"Unexpected exception:\n {e}")
-        traceback.print_exc()
+        if rank == 0:
+            print(f"Unexpected exception:\n {e}")
+            traceback.print_exc()
         exit(1)
 
     # ------------------------------------------------------------------
@@ -369,46 +387,70 @@ def _run_simulation(params: Box, params_si: Box):
     A.assemble()
 
     # ------------------------------------------------------------------
-    # PETSc KSP solver (LU)
+    # PETSc KSP solver (LU / MUMPS for parallel)
     # ------------------------------------------------------------------
     solver = PETSc.KSP().create(mesh.comm)
     solver.setOperators(A)
     solver.setType(PETSc.KSP.Type.PREONLY)
     pc = solver.getPC()
-    pc.setType(PETSc.PC.Type.LU)
+    if comm.size > 1:
+        pc.setType(PETSc.PC.Type.LU)
+        pc.setFactorSolverType("mumps")
+    else:
+        pc.setType(PETSc.PC.Type.LU)
 
     # ------------------------------------------------------------------
     # Time loop
     # ------------------------------------------------------------------
     time_steps = int(params_si.time.simulationYears.value / dt)
 
-    writer = H5Writer(
-        path=f"{base_folder}/sim_{params.time.simulationYears.value}years.h5",
-        n_EWS=n_EWS, compression="lzf", flush_every=365
-    )
+    # HDF5 writer — only rank 0 writes
+    writer = None
+    if rank == 0:
+        writer = H5Writer(
+            path=f"{base_folder}/sim_{params.time.simulationYears.value}years.h5",
+            n_EWS=n_EWS, compression="lzf", flush_every=365
+        )
 
     # Reusable PETSc vector for RHS
     b_vec = dolfinx.fem.petsc.create_vector(dolfinx.fem.form(
         T_n * v_test * ufl.dx))
 
-    with alive_bar(time_steps, title='SubTerra is running', bar='smooth') as bar:
+    # Context manager for alive_bar (only rank 0 shows progress)
+    _bar_ctx = alive_bar(time_steps, title='SubTerra is running', bar='smooth') \
+        if rank == 0 else None
+
+    def _enter_bar():
+        if _bar_ctx is not None:
+            return _bar_ctx.__enter__()
+        return None
+
+    def _exit_bar():
+        if _bar_ctx is not None:
+            _bar_ctx.__exit__(None, None, None)
+
+    bar = _enter_bar()
+
+    try:
         time_step = 1
         total_flux = 0.0
         E_probe_sum = 0.0
         last_progress_pct = -5
 
         while time_step <= time_steps:
-            cpu = cpu_percent(interval=0.0)
-            ram = virtual_memory().percent
-            bar.text(f'(CPU: {cpu:.1f}%, RAM: {ram:.1f}%)')
+            if rank == 0:
+                cpu = cpu_percent(interval=0.0)
+                ram = virtual_memory().percent
+                if bar is not None:
+                    bar.text(f'(CPU: {cpu:.1f}%, RAM: {ram:.1f}%)')
 
-            current_pct = int(time_step / time_steps * 100)
-            if time_step == 1 or current_pct >= last_progress_pct + 5 or time_step == time_steps:
-                _write_progress(
-                    'simulation', time_step, time_steps,
-                    f'Schritt {time_step}/{time_steps} — CPU: {cpu:.0f}%, RAM: {ram:.0f}%'
-                )
-                last_progress_pct = current_pct
+                current_pct = int(time_step / time_steps * 100)
+                if time_step == 1 or current_pct >= last_progress_pct + 5 or time_step == time_steps:
+                    _write_progress(
+                        'simulation', time_step, time_steps,
+                        f'Schritt {time_step}/{time_steps} — CPU: {cpu:.0f}%, RAM: {ram:.0f}%'
+                    )
+                    last_progress_pct = current_pct
 
             Q_dict = powerprofile.get(time_step)
             if not Q_dict:
@@ -438,14 +480,15 @@ def _run_simulation(params: Box, params_si: Box):
             solver.solve(b_vec, T.x.petsc_vec)
             T.x.scatter_forward()
 
-            # ── Boundary flux ──
+            # ── Boundary flux (local sum → allreduce) ──
             flux_form = dolfinx.fem.form(
                 -thermalConductivity
                 * ufl.dot(ufl.grad(T), n_vector) * ufl.ds
             )
-            flux_boundary = dolfinx.fem.assemble_scalar(flux_form)
+            flux_boundary_local = dolfinx.fem.assemble_scalar(flux_form)
+            flux_boundary = comm.allreduce(flux_boundary_local, op=MPI.SUM)
 
-            # ── Per-BHE temperature evaluation ──
+            # ── Per-BHE temperature evaluation (parallel-safe) ──
             r_EWS = params_si.power.pipeRadius.value
             Temp_EWS_row = np.empty(n_EWS, dtype=np.float32)
             W_el_row = np.empty(n_EWS, dtype=np.float32)
@@ -461,7 +504,15 @@ def _run_simulation(params: Box, params_si: Box):
                     [x, y + r_EWS],
                 ])
             eval_pts = np.array(eval_pts, dtype=np.float64)
-            T_vals = _eval_at_points_batch(mesh, T, eval_pts)
+            T_vals_local = _eval_at_points_batch(mesh, T, eval_pts)
+            # Gather results across ranks: replace NaN with large sentinel,
+            # take minimum (= the rank that actually found the cell), then
+            # restore NaN.
+            _sentinel = 1.0e30
+            T_vals_send = np.where(np.isnan(T_vals_local), _sentinel, T_vals_local)
+            T_vals_global = np.empty_like(T_vals_send)
+            comm.Allreduce(T_vals_send, T_vals_global, op=MPI.MIN)
+            T_vals = np.where(T_vals_global >= _sentinel - 1.0, np.nan, T_vals_global)
 
             for i in range(n_EWS):
                 T_EWS = float(np.nanmean(T_vals[4*i:4*i+4]))
@@ -474,7 +525,7 @@ def _run_simulation(params: Box, params_si: Box):
                     gamma=params_si.power.efficiency.value
                 )
 
-            # ── Energy balance ──
+            # ── Energy balance (local assembly → allreduce) ──
             E_T_n_form = dolfinx.fem.form(
                 dolfinx.fem.Constant(mesh, PETSc.ScalarType(heatCapacityDensity))
                 * T_n * ufl.dx
@@ -483,27 +534,29 @@ def _run_simulation(params: Box, params_si: Box):
                 dolfinx.fem.Constant(mesh, PETSc.ScalarType(heatCapacityDensity))
                 * T * ufl.dx
             )
-            E_ground_i = (
+            E_ground_i_local = (
                 dolfinx.fem.assemble_scalar(E_T_n_form)
                 - dolfinx.fem.assemble_scalar(E_T_form)
             )
+            E_ground_i = comm.allreduce(E_ground_i_local, op=MPI.SUM)
             E_flux_i = -dt * flux_boundary
             E_probe_i = dt * Q_dict * n_EWS
             error_i = E_ground_i + E_flux_i + E_probe_i
 
-            # ── Save to HDF5 ──
-            writer.append_step(
-                day=time_step,
-                error=error_i / (3600.0 * 1000.0),
-                E_probe=E_probe_i / (3600.0 * 1000.0),
-                E_flux=E_flux_i / (3600.0 * 1000.0),
-                Delta_E=E_ground_i / (3600.0 * 1000.0),
-                E_inout=(E_ground_i + E_probe_i) / (3600.0 * 1000.0),
-                Q_probe=np.nan,
-                E_storage=np.nan,
-                W_el_row=W_el_row,
-                Temp_EWS_row=Temp_EWS_row
-            )
+            # ── Save to HDF5 (rank 0 only) ──
+            if rank == 0 and writer is not None:
+                writer.append_step(
+                    day=time_step,
+                    error=error_i / (3600.0 * 1000.0),
+                    E_probe=E_probe_i / (3600.0 * 1000.0),
+                    E_flux=E_flux_i / (3600.0 * 1000.0),
+                    Delta_E=E_ground_i / (3600.0 * 1000.0),
+                    E_inout=(E_ground_i + E_probe_i) / (3600.0 * 1000.0),
+                    Q_probe=np.nan,
+                    E_storage=np.nan,
+                    W_el_row=W_el_row,
+                    Temp_EWS_row=Temp_EWS_row
+                )
 
             # ── Update T_n for next time step ──
             T_n.x.array[:] = T.x.array[:]
@@ -511,18 +564,24 @@ def _run_simulation(params: Box, params_si: Box):
             total_flux += E_flux_i
             E_probe_sum += E_probe_i
 
-            # ── Snapshots ──
+            # ── Snapshots (rank 0 only) ──
             if time_step in [365 * 1, 365 * 10, 365 * 20, 365 * 30, 365 * 40]:
-                t_between = time_step / 365.0
-                writer.add_vertex_snapshot_full(
-                    name=f"T_vertex_{t_between:.1f}a",
-                    mesh=mesh,
-                    T=T
-                )
+                if rank == 0 and writer is not None:
+                    t_between = time_step / 365.0
+                    writer.add_vertex_snapshot_full(
+                        name=f"T_vertex_{t_between:.1f}a",
+                        mesh=mesh,
+                        T=T
+                    )
 
             time_step += 1
-            bar()
+            if bar is not None:
+                bar()
 
-    writer.close()
-    _write_progress('simulation', time_steps, time_steps, 'Simulation abgeschlossen.')
-    print("Calculation finished.")
+    finally:
+        _exit_bar()
+
+    if rank == 0 and writer is not None:
+        writer.close()
+        _write_progress('simulation', time_steps, time_steps, 'Simulation abgeschlossen.')
+        print("Calculation finished.")

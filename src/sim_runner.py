@@ -15,10 +15,19 @@ import os
 import traceback
 
 from box import Box
+from mpi4py import MPI
 
 from src.simulation import calculation
 from src.simulation.utils.convert_to_si import run_conversion
 from src.simulation.utils.paths import PARAMETER_FILE, PARAMETER_FILE_SI
+
+_rank = MPI.COMM_WORLD.rank
+
+
+def _print0(*args, **kwargs):
+    """Print only on MPI rank 0."""
+    if _rank == 0:
+        print(*args, **kwargs)
 
 
 def run_simulation(parameter_file: str = PARAMETER_FILE,
@@ -53,9 +62,9 @@ def run_simulation(parameter_file: str = PARAMETER_FILE,
     # Step 1: SI-conversion
     try:
         run_conversion(parameter_file, parameter_file_si)
-        print(f"SI-Konvertierung erfolgreich: {parameter_file_si}")
+        _print0(f"SI-Konvertierung erfolgreich: {parameter_file_si}")
     except Exception as e:
-        print(f"Fehler bei der SI-Konvertierung: {e}")
+        _print0(f"Fehler bei der SI-Konvertierung: {e}")
         traceback.print_exc()
         raise
 
@@ -68,7 +77,7 @@ def run_simulation(parameter_file: str = PARAMETER_FILE,
     # Step 3: Run simulation (mesh must already exist)
     calculation.run_simulation(params, params_si)
 
-    print("Simulation complete.")
+    _print0("Simulation complete.")
 
 
 def main():
