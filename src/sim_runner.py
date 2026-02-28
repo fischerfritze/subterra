@@ -2,7 +2,7 @@
 sim_runner.py — Standalone simulation program.
 
 Loads a previously generated mesh from params/temp/ and runs the
-FEniCS simulation. Requires mesh_runner.py to have been executed first.
+DOLFINx (FEniCSx) simulation. Requires mesh_runner.py to have been executed first.
 
 Usage:
     python -m src.sim_runner
@@ -73,7 +73,7 @@ def run_simulation(parameter_file: str = PARAMETER_FILE,
 
 def main():
     parser = argparse.ArgumentParser(
-        description="SubTerra Simulation Runner — runs FEniCS simulation with pre-generated mesh"
+        description="SubTerra Simulation Runner — runs DOLFINx simulation with pre-generated mesh"
     )
     parser.add_argument(
         "--params",
