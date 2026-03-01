@@ -1,62 +1,69 @@
-# SubTerra Docker Usage
+# SubTerra – Docker Quick Reference
 
-## Build the Docker image
+## Architecture
+
+| Service | Purpose |
+|---------|---------|
+| **backend** | Laravel API + Vue SPA + queue workers (PHP, no Python) |
+| **redis** | Queue broker & cache |
+| **fenics** | FEniCSx simulation image (DOLFINx v0.9.0, MPICH). Build-only – spawned per job via `docker run`. |
+
+Jobs share data through the named volume `subterra_jobs_data`.
+
+## Build & Start
 
 ```bash
-docker build -t subterra-calc -f src/simulation/Dockerfile .
+docker compose build              # build all images
+docker compose up -d backend redis  # start web + queue
 ```
 
-## Run the calculation
+Rebuild after code changes:
 
-You must mount your parameter file and results directory into the container. The calculation script expects the first argument to be the path to the parameter file, and the second (optional) argument to be the output `.h5` file path.
+```bash
+docker compose build --no-cache && docker compose up -d backend redis
+```
 
-### Example: Run calculation with params and output file
+## Manual Runs (outside Laravel)
+
+### Mesh generation
 
 ```bash
 docker run --rm \
-  -v /absolute/path/to/params.json:/subterra/params.json \
-  -v /absolute/path/to/results:/subterra/results \
-  subterra-calc /subterra/params.json /subterra/results/output.h5
+  -v subterra_jobs_data:/subterra/jobs \
+  -e JOB_ID=<uuid> \
+  subterra-fenics \
+  python3 -m src.mesh_runner --params /subterra/jobs/<uuid>/parameter.json
 ```
 
-- `/absolute/path/to/params.json` is your parameter file on the host.
-- `/absolute/path/to/results` is a directory on the host where results will be written.
-- `/subterra/params.json` and `/subterra/results/output.h5` are paths inside the container.
-
-### Run calculation with only params file (output will be written to default location)
+### Simulation (MPI-parallel)
 
 ```bash
 docker run --rm \
-  -v /absolute/path/to/params.json:/subterra/params.json \
-  -v /absolute/path/to/results:/subterra/results \
-  subterra-calc /subterra/params.json
+  -v subterra_jobs_data:/subterra/jobs \
+  -e JOB_ID=<uuid> \
+  subterra-fenics \
+  mpirun -np 4 python3 -m src.sim_runner --params /subterra/jobs/<uuid>/parameter.json
 ```
 
-### Use the Python CLI wrapper
-
-You can also use the provided `main.py` script to simplify running the calculation:
+### Plot generation
 
 ```bash
-python main.py simulate --params /absolute/path/to/params.json --output /absolute/path/to/results/output.h5
+docker run --rm \
+  -v subterra_jobs_data:/subterra/jobs \
+  -e JOB_ID=<uuid> \
+  subterra-fenics \
+  python3 -m src.plot_runner --job-dir /subterra/jobs/<uuid>
 ```
 
-## Additional Docker commands
+### Interactive shell
 
-- **Interactive shell for debugging:**
+```bash
+docker run --rm -it subterra-fenics /bin/bash
+```
 
-  ```bash
-  docker run --rm -it subterra-calc /bin/bash
-  ```
+## Container Internals
 
-- **Mount additional data:**
-
-  ```bash
-  docker run --rm -v /host/data:/subterra/data subterra-calc python src/your_script.py /subterra/data/input.dat
-  ```
-
-## Notes
-
-- Always use absolute paths for mounting files and directories.
-- The working directory inside the container is `/subterra`.
-- The calculation script (`src/simulation/calculation.py`) expects arguments as described above.
-- You can extend the image or run other scripts as needed.
+- **Working directory:** `/subterra`
+- **Entrypoint:** `docker/entrypoint.sh` – creates symlinks `/subterra/params` → job dir, `/subterra/results` → job results dir based on `JOB_ID`.
+- **MPI:** MPICH (bundled with DOLFINx). Core count configurable via `SUBTERRA_MPI_CORES` env var (default: 4). Uses MUMPS for parallel LU factorisation.
+- **Solver:** PETSc KSP (PREONLY + LU/MUMPS). Falls back to serial LU when running on a single rank.
